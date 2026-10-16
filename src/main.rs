@@ -446,6 +446,63 @@ fn render_sparkline(samples: &[u64]) -> String {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let args: Vec<String> = std::env::args().collect();
+    let mut init_mode: Option<PracticeMode> = None;
+    let mut init_duration: Option<TestDuration> = None;
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-h" | "--help" => {
+                println!("ttype 0.1.0 — minimalist terminal typing speed test\n");
+                println!("USAGE:");
+                println!("  ttype [OPTIONS]\n");
+                println!("OPTIONS:");
+                println!("  -m, --mode <MODE>       Practice mode: ru, en, code, quotes");
+                println!("  -t, --time <SECS>       Test duration: 15, 30");
+                println!("  -h, --help              Print this help message");
+                println!("  -v, --version           Print version\n");
+                println!("KEYBINDINGS:");
+                println!("  tab                     Restart test / new sheet");
+                println!("  f1                      Cycle mode (ru -> en -> code -> quotes)");
+                println!("  f2                      Cycle timer (15s <-> 30s)");
+                println!("  f3                      View local stats & records");
+                println!("  f4                      Settings menu");
+                println!("  esc                     Restart test / back to typing");
+                println!("  esc esc                 Quit application");
+                return Ok(());
+            }
+            "-v" | "--version" => {
+                println!("ttype 0.1.0");
+                return Ok(());
+            }
+            "-m" | "--mode" => {
+                if i + 1 < args.len() {
+                    i += 1;
+                    init_mode = match args[i].to_lowercase().as_str() {
+                        "ru" | "russian" => Some(PracticeMode::Russian),
+                        "en" | "english" => Some(PracticeMode::English),
+                        "code" => Some(PracticeMode::Code),
+                        "quote" | "quotes" => Some(PracticeMode::Quotes),
+                        _ => None,
+                    };
+                }
+            }
+            "-t" | "--time" => {
+                if i + 1 < args.len() {
+                    i += 1;
+                    init_duration = match args[i].as_str() {
+                        "15" | "15s" => Some(TestDuration::Sec15),
+                        "30" | "30s" => Some(TestDuration::Sec30),
+                        _ => None,
+                    };
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -453,6 +510,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App::new();
+    if let Some(m) = init_mode {
+        app.practice_mode = m;
+        app.reset_test();
+    }
+    if let Some(d) = init_duration {
+        app.duration = d;
+        app.reset_test();
+    }
+
     let tick_rate = Duration::from_millis(25);
     let mut last_tick = Instant::now();
 
