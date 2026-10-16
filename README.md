@@ -1,10 +1,20 @@
-# ttype
-
 <p align="center">
   <b>minimalist terminal typing speed test</b>
   <br>
   <i>smooth one-line conveyor · mechanical sounds · rust</i>
 </p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/actions/workflow/status/laguser/ttype/ci.yml?branch=main&style=flat-square&color=yellow" alt="CI">
+  <img src="https://img.shields.io/github/license/laguser/ttype?style=flat-square&color=blue" alt="License">
+  <img src="https://img.shields.io/badge/arch_linux-PKGBUILD-1793d1?style=flat-square&logo=arch-linux" alt="Arch">
+</p>
+
+```text
+                           ru · 15s · 11s · 94 wpm
+     ...быстро точно фокус [в] е ч е р   к о ф е   р а б о т а...
+           tab restart   f1 mode   f2 time   f3 stats   f4 config
+```
 
 <p align="center">
   <a href="#english">English</a> • <a href="#русский">Русский</a>
