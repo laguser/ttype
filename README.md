@@ -5,15 +5,15 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/actions/workflow/status/laguser/ttype/ci.yml?branch=main&style=flat-square&color=yellow" alt="CI">
+  <a href="https://crates.io/crates/ttype-cli"><img src="https://img.shields.io/crates/v/ttype-cli.svg?style=flat-square&color=orange" alt="crates.io"></a>
+  <a href="https://crates.io/crates/ttype-cli"><img src="https://img.shields.io/crates/d/ttype-cli.svg?style=flat-square&color=blue" alt="downloads"></a>
   <img src="https://img.shields.io/github/license/laguser/ttype?style=flat-square&color=blue" alt="License">
-  <img src="https://img.shields.io/badge/arch_linux-PKGBUILD-1793d1?style=flat-square&logo=arch-linux" alt="Arch">
 </p>
 
 ```text
-                           ru · 15s · 11s · 94 wpm
+                           ◈ ru · ◷ 15s · 11s · ⚡ 94 wpm
      ...быстро точно фокус [в] е ч е р   к о ф е   р а б о т а...
-           tab restart   f1 mode   f2 time   f3 stats   f4 config
+           ↵ tab restart   ◈ f1 mode   ◷ f2 time   ▤ f3 stats   ⚙ f4 config
 ```
 
 <p align="center">
@@ -41,6 +41,11 @@ A keyboard-first, distraction-free typing speed test built for terminal purists.
 - **Themes & Styles:** `auto (term)`, `catppuccin`, `tokyo night`, `nord`, `gruvbox`, `dracula`, `amber`, `white` across 4 cursor styles (`tape`, `underline`, `blocky`, `minimal`).
 
 ### Installation
+
+#### Via Cargo (Recommended)
+```bash
+cargo install ttype-cli
+```
 
 #### Quick One-Liner (Build & Install)
 ```bash
@@ -88,6 +93,11 @@ cp target/release/ttype ~/.local/bin/
 - **Стили и темы:** Адаптация `auto (term)`, а также `catppuccin`, `tokyo night`, `nord`, `gruvbox` и 4 стиля курсора.
 
 ### Установка
+
+#### Через Cargo (Рекомендуется):
+```bash
+cargo install ttype-cli
+```
 
 #### Быстрая установка одной командой:
 ```bash
