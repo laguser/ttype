@@ -1,21 +1,45 @@
 [
   {
-    "id": "russian",
-    "name": "Russian",
+    "id": "code_c",
+    "name": "Code: C",
     "words_count": 200,
-    "file": "russian.txt"
+    "file": "code_c.txt"
   },
   {
-    "id": "russian_1k",
-    "name": "Russian 1K",
-    "words_count": 996,
-    "file": "russian_1k.txt"
+    "id": "code_go",
+    "name": "Code: Go",
+    "words_count": 63,
+    "file": "code_go.txt"
   },
   {
-    "id": "russian_10k",
-    "name": "Russian 10K",
-    "words_count": 9996,
-    "file": "russian_10k.txt"
+    "id": "code_html",
+    "name": "Code: Html",
+    "words_count": 232,
+    "file": "code_html.txt"
+  },
+  {
+    "id": "code_javascript",
+    "name": "Code: Javascript",
+    "words_count": 126,
+    "file": "code_javascript.txt"
+  },
+  {
+    "id": "code_python",
+    "name": "Code: Python",
+    "words_count": 174,
+    "file": "code_python.txt"
+  },
+  {
+    "id": "code_rust",
+    "name": "Code: Rust",
+    "words_count": 192,
+    "file": "code_rust.txt"
+  },
+  {
+    "id": "english_10k",
+    "name": "English 10K",
+    "words_count": 9944,
+    "file": "english_10k.txt"
   },
   {
     "id": "english_1k",
@@ -28,36 +52,6 @@
     "name": "English 5K",
     "words_count": 5000,
     "file": "english_5k.txt"
-  },
-  {
-    "id": "english_10k",
-    "name": "English 10K",
-    "words_count": 9944,
-    "file": "english_10k.txt"
-  },
-  {
-    "id": "spanish",
-    "name": "Spanish",
-    "words_count": 197,
-    "file": "spanish.txt"
-  },
-  {
-    "id": "spanish_1k",
-    "name": "Spanish 1K",
-    "words_count": 998,
-    "file": "spanish_1k.txt"
-  },
-  {
-    "id": "german",
-    "name": "German",
-    "words_count": 200,
-    "file": "german.txt"
-  },
-  {
-    "id": "german_1k",
-    "name": "German 1K",
-    "words_count": 988,
-    "file": "german_1k.txt"
   },
   {
     "id": "french",
@@ -78,6 +72,18 @@
     "file": "french_2k.txt"
   },
   {
+    "id": "german",
+    "name": "German",
+    "words_count": 200,
+    "file": "german.txt"
+  },
+  {
+    "id": "german_1k",
+    "name": "German 1K",
+    "words_count": 988,
+    "file": "german_1k.txt"
+  },
+  {
     "id": "italian",
     "name": "Italian",
     "words_count": 199,
@@ -88,6 +94,18 @@
     "name": "Italian 1K",
     "words_count": 1159,
     "file": "italian_1k.txt"
+  },
+  {
+    "id": "japanese_romaji",
+    "name": "Japanese Romaji",
+    "words_count": 153,
+    "file": "japanese_romaji.txt"
+  },
+  {
+    "id": "polish",
+    "name": "Polish",
+    "words_count": 183,
+    "file": "polish.txt"
   },
   {
     "id": "portuguese",
@@ -102,22 +120,34 @@
     "file": "portuguese_1k.txt"
   },
   {
-    "id": "ukrainian",
-    "name": "Ukrainian",
-    "words_count": 199,
-    "file": "ukrainian.txt"
+    "id": "russian",
+    "name": "Russian",
+    "words_count": 200,
+    "file": "russian.txt"
   },
   {
-    "id": "ukrainian_1k",
-    "name": "Ukrainian 1K",
-    "words_count": 1000,
-    "file": "ukrainian_1k.txt"
+    "id": "russian_10k",
+    "name": "Russian 10K",
+    "words_count": 9996,
+    "file": "russian_10k.txt"
   },
   {
-    "id": "polish",
-    "name": "Polish",
-    "words_count": 183,
-    "file": "polish.txt"
+    "id": "russian_1k",
+    "name": "Russian 1K",
+    "words_count": 996,
+    "file": "russian_1k.txt"
+  },
+  {
+    "id": "spanish",
+    "name": "Spanish",
+    "words_count": 197,
+    "file": "spanish.txt"
+  },
+  {
+    "id": "spanish_1k",
+    "name": "Spanish 1K",
+    "words_count": 998,
+    "file": "spanish_1k.txt"
   },
   {
     "id": "turkish",
@@ -132,9 +162,27 @@
     "file": "turkish_1k.txt"
   },
   {
-    "id": "japanese_romaji",
-    "name": "Japanese Romaji",
-    "words_count": 153,
-    "file": "japanese_romaji.txt"
+    "id": "ukrainian",
+    "name": "Ukrainian",
+    "words_count": 199,
+    "file": "ukrainian.txt"
+  },
+  {
+    "id": "ukrainian_1k",
+    "name": "Ukrainian 1K",
+    "words_count": 1000,
+    "file": "ukrainian_1k.txt"
+  },
+  {
+    "id": "war_and_peace_en",
+    "name": "War & Peace Quotes En",
+    "words_count": 6491,
+    "file": "war_and_peace_en.txt"
+  },
+  {
+    "id": "war_and_peace_ru",
+    "name": "War & Peace Quotes Ru",
+    "words_count": 1163,
+    "file": "war_and_peace_ru.txt"
   }
 ]
