@@ -426,6 +426,12 @@ impl App {
     }
 }
 
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // рисуем мини-график скорости по секундам :3
 fn render_sparkline(samples: &[u64]) -> String {
     if samples.is_empty() {
@@ -488,15 +494,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     };
                 }
             }
-            "-t" | "--time" => {
-                if i + 1 < args.len() {
-                    i += 1;
-                    init_duration = match args[i].as_str() {
-                        "15" | "15s" => Some(TestDuration::Sec15),
-                        "30" | "30s" => Some(TestDuration::Sec30),
-                        _ => None,
-                    };
-                }
+            "-t" | "--time" if i + 1 < args.len() => {
+                i += 1;
+                init_duration = match args[i].as_str() {
+                    "15" | "15s" => Some(TestDuration::Sec15),
+                    "30" | "30s" => Some(TestDuration::Sec30),
+                    _ => None,
+                };
             }
             _ => {}
         }
