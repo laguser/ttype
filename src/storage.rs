@@ -51,6 +51,31 @@ impl ThemeColor {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub enum DownloadSource {
+    Moscow,   // 🇷🇺 msc-1 VPS
+    Germany,  // 🇩🇪 de-1 VPS
+    GitHub,   // 🐙 GitHub CDN
+}
+
+impl DownloadSource {
+    pub fn name(&self) -> &'static str {
+        match self {
+            DownloadSource::Moscow => "moscow (vps)",
+            DownloadSource::Germany => "germany (vps)",
+            DownloadSource::GitHub => "github (cdn)",
+        }
+    }
+
+    pub fn base_url(&self) -> &'static str {
+        match self {
+            DownloadSource::Moscow => "http://93.88.203.50:8089/ttype/dicts",
+            DownloadSource::Germany => "http://31.76.11.45:8089/ttype/dicts",
+            DownloadSource::GitHub => "https://raw.githubusercontent.com/laguser/ttype/main/dicts",
+        }
+    }
+}
+
 // локальный конфиг юзера
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
@@ -61,6 +86,16 @@ pub struct Config {
     pub visual: VisualStyle,
     pub live_wpm: bool,
     pub sudden_death: bool,
+    #[serde(default)]
+    pub mirror: DownloadSource,
+    #[serde(default)]
+    pub active_lang: String,
+}
+
+impl Default for DownloadSource {
+    fn default() -> Self {
+        DownloadSource::Moscow
+    }
 }
 
 impl Default for Config {
@@ -73,6 +108,8 @@ impl Default for Config {
             visual: VisualStyle::Tape,
             live_wpm: true,
             sudden_death: false,
+            mirror: DownloadSource::Moscow,
+            active_lang: String::from("en"),
         }
     }
 }
@@ -107,6 +144,16 @@ impl DataStore {
             let _ = fs::create_dir_all(&path);
         }
         path.push("history.json");
+        Some(path)
+    }
+
+    pub fn dicts_dir() -> Option<PathBuf> {
+        let mut path = dirs::data_local_dir().or_else(dirs::home_dir)?;
+        path.push(".ttype");
+        path.push("dicts");
+        if !path.exists() {
+            let _ = fs::create_dir_all(&path);
+        }
         Some(path)
     }
 

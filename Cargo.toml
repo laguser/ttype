@@ -24,3 +24,4 @@ serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "5.0"
 rodio = { version = "0.19", default-features = false, features = ["symphonia-wav"] }
+ureq = { version = "2.10", default-features = false, features = ["tls"] }

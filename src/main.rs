@@ -1,4 +1,5 @@
 mod audio;
+mod lang;
 mod storage;
 mod words;
 
@@ -8,6 +9,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use lang::LangManager;
 use rand::{seq::SliceRandom, Rng};
 use ratatui::{
     backend::CrosstermBackend,
@@ -22,27 +24,7 @@ use std::{
     io,
     time::{Duration, Instant},
 };
-use storage::{DataStore, TestResult, ThemeColor, VisualStyle};
-
-// режимы тренировки
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum PracticeMode {
-    Russian,
-    English,
-    Code,
-    Quotes,
-}
-
-impl PracticeMode {
-    pub fn name(&self) -> &'static str {
-        match self {
-            PracticeMode::Russian => "ru",
-            PracticeMode::English => "en",
-            PracticeMode::Code => "code",
-            PracticeMode::Quotes => "quotes",
-        }
-    }
-}
+use storage::{DataStore, DownloadSource, TestResult, ThemeColor, VisualStyle};
 
 // лимиты времени
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -58,13 +40,17 @@ pub enum AppMode {
     Result,
     Settings,
     HistoryView,
+    Languages, // ◧ менеджер языков и зеркал
 }
 
 pub struct App {
-    pub practice_mode: PracticeMode,
+    pub active_lang: String, // "en", "code", "quotes", или id скачанного языка ("russian", "russian_1k", etc.)
     pub duration: TestDuration,
     pub mode: AppMode,
     pub settings_cursor: usize,
+    pub lang_cursor: usize,
+    pub lang_manager: LangManager,
+    pub lang_status_msg: Option<String>,
     pub target_chars: Vec<char>,
     pub typed_chars: Vec<char>,
     pub start_time: Option<Instant>,
@@ -81,11 +67,23 @@ impl App {
     pub fn new() -> Self {
         let store = DataStore::load();
         let sound = SoundEngine::new();
+        let dicts_dir = DataStore::dicts_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+        let lang_manager = LangManager::new(&dicts_dir);
+
+        let active_lang = if store.config.active_lang.is_empty() {
+            "en".to_string()
+        } else {
+            store.config.active_lang.clone()
+        };
+
         let mut app = Self {
-            practice_mode: PracticeMode::Russian,
+            active_lang,
             duration: TestDuration::Sec15,
             mode: AppMode::Typing,
             settings_cursor: 0,
+            lang_cursor: 0,
+            lang_manager,
+            lang_status_msg: None,
             target_chars: Vec::new(),
             typed_chars: Vec::new(),
             start_time: None,
@@ -101,10 +99,9 @@ impl App {
         app
     }
 
-    // подтягиваем акцентный цвет в зависимости от выбранной темы
     pub fn theme_accent(&self) -> Color {
         match self.store.config.theme {
-            ThemeColor::Auto => Color::Yellow, // берет родной желтый из палитры терминала d:
+            ThemeColor::Auto => Color::Yellow,
             ThemeColor::Catppuccin => Color::Rgb(203, 166, 247),
             ThemeColor::TokyoNight => Color::Rgb(125, 207, 255),
             ThemeColor::Nord => Color::Rgb(136, 192, 208),
@@ -115,80 +112,106 @@ impl App {
         }
     }
 
-    // генерируем случайный текст для раунда
+    pub fn available_modes(&self) -> Vec<String> {
+        let mut modes = vec!["en".to_string(), "code".to_string(), "quotes".to_string()];
+        for inst in &self.lang_manager.installed {
+            if !modes.contains(inst) {
+                modes.push(inst.clone());
+            }
+        }
+        modes
+    }
+
+    pub fn cycle_mode(&mut self) {
+        let modes = self.available_modes();
+        if let Some(idx) = modes.iter().position(|m| m == &self.active_lang) {
+            let next_idx = (idx + 1) % modes.len();
+            self.active_lang = modes[next_idx].clone();
+        } else {
+            self.active_lang = "en".to_string();
+        }
+        self.store.config.active_lang = self.active_lang.clone();
+        self.store.save();
+        self.reset_test();
+    }
+
     pub fn generate_text(&self) -> String {
         let mut rng = rand::thread_rng();
 
-        match self.practice_mode {
-            PracticeMode::Quotes => {
-                // берем случайную цитату, а если тест долгий — склеиваем 2-3 разные O_0
-                let count = if self.duration == TestDuration::Sec30 { 3 } else { 2 };
-                let mut quotes_pool = words::QUOTES.to_vec();
-                quotes_pool.shuffle(&mut rng);
-                quotes_pool.into_iter().take(count).collect::<Vec<_>>().join(" ")
-            }
-            PracticeMode::Russian => {
-                let mut chosen = Vec::new();
-                let mut last_word = "";
-                for _ in 0..120 {
-                    if let Some(&w) = words::WORDS_RU.choose(&mut rng) {
-                        // избегаем дублей подряд :3
-                        if w == last_word {
-                            continue;
-                        }
-                        last_word = w;
+        if self.active_lang == "quotes" {
+            let count = if self.duration == TestDuration::Sec30 { 3 } else { 2 };
+            let mut quotes_pool = words::QUOTES.to_vec();
+            quotes_pool.shuffle(&mut rng);
+            return quotes_pool.into_iter().take(count).collect::<Vec<_>>().join(" ");
+        }
 
-                        let mut word = w.to_string();
-                        if self.store.config.punctuation && rng.gen_bool(0.25) {
-                            let punc = [",", ".", "!", "?", " —", ";", ":"].choose(&mut rng).unwrap();
-                            word.push_str(punc);
-                        }
-                        if self.store.config.numbers && rng.gen_bool(0.12) {
-                            let num = rng.gen_range(0..100);
-                            word = format!("{}{}", word, num);
-                        }
-                        chosen.push(word);
-                    }
+        if self.active_lang == "code" {
+            let mut chosen = Vec::new();
+            for _ in 0..100 {
+                if let Some(&w) = words::CODE_WORDS.choose(&mut rng) {
+                    chosen.push(w.to_string());
                 }
-                chosen.join(" ")
             }
-            PracticeMode::English => {
-                let mut chosen = Vec::new();
-                let mut last_word = "";
-                for _ in 0..120 {
-                    if let Some(&w) = words::WORDS_EN.choose(&mut rng) {
-                        if w == last_word {
-                            continue;
-                        }
-                        last_word = w;
+            return chosen.join(" ");
+        }
 
-                        let mut word = w.to_string();
-                        if self.store.config.punctuation && rng.gen_bool(0.25) {
-                            let punc = [",", ".", "!", "?", " -", ";", ":"].choose(&mut rng).unwrap();
-                            word.push_str(punc);
+        // Если это скачанный сторонний словарь (russian, spanish, german_1k, etc.)
+        if self.active_lang != "en" {
+            if let Some(dicts_dir) = DataStore::dicts_dir() {
+                let file_path = dicts_dir.join(format!("{}.txt", self.active_lang));
+                if let Some(custom_words) = words::load_dict_words(&file_path) {
+                    let mut chosen = Vec::new();
+                    let mut last_word = String::new();
+                    for _ in 0..120 {
+                        if let Some(w) = custom_words.choose(&mut rng) {
+                            if w == &last_word {
+                                continue;
+                            }
+                            last_word = w.clone();
+                            let mut word = w.clone();
+                            if self.store.config.punctuation && rng.gen_bool(0.25) {
+                                let punc = [",", ".", "!", "?", " -", ";", ":"].choose(&mut rng).unwrap();
+                                word.push_str(punc);
+                            }
+                            if self.store.config.numbers && rng.gen_bool(0.12) {
+                                let num = rng.gen_range(0..100);
+                                word = format!("{}{}", word, num);
+                            }
+                            chosen.push(word);
                         }
-                        if self.store.config.numbers && rng.gen_bool(0.12) {
-                            let num = rng.gen_range(0..100);
-                            word = format!("{}{}", word, num);
-                        }
-                        chosen.push(word);
+                    }
+                    if !chosen.is_empty() {
+                        return chosen.join(" ");
                     }
                 }
-                chosen.join(" ")
-            }
-            PracticeMode::Code => {
-                let mut chosen = Vec::new();
-                for _ in 0..100 {
-                    if let Some(&w) = words::CODE_WORDS.choose(&mut rng) {
-                        chosen.push(w.to_string());
-                    }
-                }
-                chosen.join(" ")
             }
         }
+
+        // Дефолтный английский встроенный словарь
+        let mut chosen = Vec::new();
+        let mut last_word = "";
+        for _ in 0..120 {
+            if let Some(&w) = words::WORDS_EN.choose(&mut rng) {
+                if w == last_word {
+                    continue;
+                }
+                last_word = w;
+
+                let mut word = w.to_string();
+                if self.store.config.punctuation && rng.gen_bool(0.25) {
+                    let punc = [",", ".", "!", "?", " -", ";", ":"].choose(&mut rng).unwrap();
+                    word.push_str(punc);
+                }
+                if self.store.config.numbers && rng.gen_bool(0.12) {
+                    let num = rng.gen_range(0..100);
+                    word = format!("{}{}", word, num);
+                }
+                chosen.push(word);
+            }
+        }
+        chosen.join(" ")
     }
 
-    // сброс раунда и генерация новой ленты
     pub fn reset_test(&mut self) {
         let text = self.generate_text();
         self.target_chars = text.chars().collect();
@@ -200,7 +223,6 @@ impl App {
         self.mode = AppMode::Typing;
     }
 
-    // сколько секунд осталось до конца таймера
     pub fn time_remaining(&self) -> Duration {
         let limit = Duration::from_secs(self.duration as u64);
         if let Some(start) = self.start_time {
@@ -215,7 +237,6 @@ impl App {
         }
     }
 
-    // подсчет текущей скорости на лету
     pub fn current_wpm(&self) -> f64 {
         if let Some(start) = self.start_time {
             let elapsed = Instant::now().duration_since(start).as_secs_f64().max(0.1);
@@ -231,7 +252,6 @@ impl App {
         }
     }
 
-    // завершение теста и сохранение рекорда
     pub fn finish_test(&mut self) {
         let end = Instant::now();
         self.end_time = Some(end);
@@ -257,20 +277,12 @@ impl App {
             0.0
         };
 
-        let mins = elapsed_secs / 60.0;
-        let wpm = (correct as f64 / 5.0) / mins;
-        let cpm = (correct as f64) / mins;
-
-        let mode_desc = format!(
-            "{}{}{}",
-            self.practice_mode.name(),
-            if self.store.config.punctuation { "+punc" } else { "" },
-            if self.store.config.numbers { "+num" } else { "" }
-        );
+        let wpm = (correct as f64 / 5.0) / (elapsed_secs / 60.0);
+        let cpm = (correct as f64) / (elapsed_secs / 60.0);
 
         let result = TestResult {
             date: chrono::Local::now(),
-            mode_name: mode_desc,
+            mode_name: self.active_lang.clone(),
             duration_secs: self.duration as u64,
             wpm,
             cpm,
@@ -282,7 +294,7 @@ impl App {
         };
 
         if self.store.config.sound_enabled {
-            self.sound.play_bell(); // дзинь! d:
+            self.sound.play_bell();
         }
 
         self.store.save_result(result.clone());
@@ -290,20 +302,11 @@ impl App {
         self.mode = AppMode::Result;
     }
 
-    // обработка нажатий клавиш
     pub fn handle_key(&mut self, key: KeyEvent) {
         match self.mode {
             AppMode::Typing => match key.code {
                 KeyCode::Tab => self.reset_test(),
-                KeyCode::F(1) => {
-                    self.practice_mode = match self.practice_mode {
-                        PracticeMode::Russian => PracticeMode::English,
-                        PracticeMode::English => PracticeMode::Code,
-                        PracticeMode::Code => PracticeMode::Quotes,
-                        PracticeMode::Quotes => PracticeMode::Russian,
-                    };
-                    self.reset_test();
-                }
+                KeyCode::F(1) => self.cycle_mode(),
                 KeyCode::F(2) => {
                     self.duration = match self.duration {
                         TestDuration::Sec15 => TestDuration::Sec30,
@@ -313,6 +316,7 @@ impl App {
                 }
                 KeyCode::F(3) => self.mode = AppMode::HistoryView,
                 KeyCode::F(4) => self.mode = AppMode::Settings,
+                KeyCode::F(5) => self.mode = AppMode::Languages,
                 KeyCode::Backspace => {
                     if !self.typed_chars.is_empty() {
                         self.typed_chars.pop();
@@ -322,7 +326,6 @@ impl App {
                     }
                 }
                 KeyCode::Char(c) => {
-                    // стартуем таймер ровно с первой нажатой буквы
                     if self.start_time.is_none() {
                         self.start_time = Some(Instant::now());
                     }
@@ -330,7 +333,6 @@ impl App {
                     let cur_idx = self.typed_chars.len();
                     let is_correct = cur_idx < self.target_chars.len() && self.target_chars[cur_idx] == c;
 
-                    // режим внезапной смерти: ошибся — гуляй, начинай заново ):
                     if !is_correct && self.store.config.sudden_death {
                         if self.store.config.sound_enabled {
                             self.sound.play_error();
@@ -363,7 +365,7 @@ impl App {
                     }
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    if self.settings_cursor < 6 {
+                    if self.settings_cursor < 7 {
                         self.settings_cursor += 1;
                     }
                 }
@@ -399,6 +401,13 @@ impl App {
                                 VisualStyle::Minimal => VisualStyle::Tape,
                             };
                         }
+                        7 => {
+                            self.store.config.mirror = match self.store.config.mirror {
+                                DownloadSource::Moscow => DownloadSource::Germany,
+                                DownloadSource::Germany => DownloadSource::GitHub,
+                                DownloadSource::GitHub => DownloadSource::Moscow,
+                            };
+                        }
                         _ => {}
                     }
                     self.store.save();
@@ -409,10 +418,63 @@ impl App {
                 }
                 _ => {}
             },
+            AppMode::Languages => match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if self.lang_cursor > 0 {
+                        self.lang_cursor -= 1;
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if self.lang_cursor + 1 < self.lang_manager.items.len() {
+                        self.lang_cursor += 1;
+                    }
+                }
+                KeyCode::Char('m') | KeyCode::Tab => {
+                    self.store.config.mirror = match self.store.config.mirror {
+                        DownloadSource::Moscow => DownloadSource::Germany,
+                        DownloadSource::Germany => DownloadSource::GitHub,
+                        DownloadSource::GitHub => DownloadSource::Moscow,
+                    };
+                    self.store.save();
+                }
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    if let Some(dicts_dir) = DataStore::dicts_dir() {
+                        let item = self.lang_manager.items[self.lang_cursor].clone();
+                        let base_url = self.store.config.mirror.base_url();
+                        let is_inst = self.lang_manager.is_installed(&item.id);
+
+                        if is_inst {
+                            self.active_lang = item.id.clone();
+                            self.store.config.active_lang = item.id;
+                            self.store.save();
+                            self.lang_status_msg = Some(format!("◈ selected: {}", item.name));
+                        } else {
+                            self.lang_status_msg = Some(format!("◷ downloading {}...", item.name));
+                            match self.lang_manager.download_dict(&dicts_dir, base_url, &item) {
+                                Ok(_) => {
+                                    self.active_lang = item.id.clone();
+                                    self.store.config.active_lang = item.id;
+                                    self.store.save();
+                                    self.lang_status_msg = Some(format!("✓ installed & activated: {}", item.name));
+                                }
+                                Err(e) => {
+                                    self.lang_status_msg = Some(format!("✕ failed: {}", e));
+                                }
+                            }
+                        }
+                    }
+                }
+                KeyCode::Esc | KeyCode::F(5) => {
+                    self.mode = AppMode::Typing;
+                    self.reset_test();
+                }
+                _ => {}
+            },
             AppMode::Result => match key.code {
                 KeyCode::Tab | KeyCode::Enter | KeyCode::Char(' ') => self.reset_test(),
                 KeyCode::Char('s') | KeyCode::F(4) => self.mode = AppMode::Settings,
                 KeyCode::Char('h') | KeyCode::F(3) => self.mode = AppMode::HistoryView,
+                KeyCode::Char('l') | KeyCode::F(5) => self.mode = AppMode::Languages,
                 _ => {}
             },
             AppMode::HistoryView => match key.code {
@@ -432,7 +494,6 @@ impl Default for App {
     }
 }
 
-// рисуем мини-график скорости по секундам :3
 fn render_sparkline(samples: &[u64]) -> String {
     if samples.is_empty() {
         return String::new();
@@ -453,7 +514,7 @@ fn render_sparkline(samples: &[u64]) -> String {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
-    let mut init_mode: Option<PracticeMode> = None;
+    let mut init_mode: Option<String> = None;
     let mut init_duration: Option<TestDuration> = None;
 
     let mut i = 1;
@@ -464,16 +525,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("USAGE:");
                 println!("  ttype [OPTIONS]\n");
                 println!("OPTIONS:");
-                println!("  -m, --mode <MODE>       Practice mode: ru, en, code, quotes");
+                println!("  -m, --mode <MODE>       Practice mode: en, code, quotes, or installed dict id");
                 println!("  -t, --time <SECS>       Test duration: 15, 30");
                 println!("  -h, --help              Print this help message");
                 println!("  -v, --version           Print version\n");
                 println!("KEYBINDINGS:");
                 println!("  tab                     Restart test / new sheet");
-                println!("  f1                      Cycle mode (ru -> en -> code -> quotes)");
+                println!("  f1                      Cycle mode (en -> code -> quotes -> custom)");
                 println!("  f2                      Cycle timer (15s <-> 30s)");
                 println!("  f3                      View local stats & records");
                 println!("  f4                      Settings menu");
+                println!("  f5                      Languages & mirror downloader (all Blind Typing langs)");
                 println!("  esc                     Restart test / back to typing");
                 println!("  esc esc                 Quit application");
                 return Ok(());
@@ -482,17 +544,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("ttype 0.1.0");
                 return Ok(());
             }
-            "-m" | "--mode" => {
-                if i + 1 < args.len() {
-                    i += 1;
-                    init_mode = match args[i].to_lowercase().as_str() {
-                        "ru" | "russian" => Some(PracticeMode::Russian),
-                        "en" | "english" => Some(PracticeMode::English),
-                        "code" => Some(PracticeMode::Code),
-                        "quote" | "quotes" => Some(PracticeMode::Quotes),
-                        _ => None,
-                    };
-                }
+            "-m" | "--mode" if i + 1 < args.len() => {
+                i += 1;
+                init_mode = Some(args[i].clone());
             }
             "-t" | "--time" if i + 1 < args.len() => {
                 i += 1;
@@ -515,31 +569,27 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut app = App::new();
     if let Some(m) = init_mode {
-        app.practice_mode = m;
-        app.reset_test();
+        app.active_lang = m;
+        app.store.config.active_lang = app.active_lang.clone();
     }
     if let Some(d) = init_duration {
         app.duration = d;
-        app.reset_test();
     }
+    app.reset_test();
 
-    let tick_rate = Duration::from_millis(25);
+    let tick_rate = Duration::from_millis(50);
     let mut last_tick = Instant::now();
 
     loop {
         terminal.draw(|f| ui(f, &app))?;
 
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
-
+        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                     break;
                 }
 
-                // умный esc: один раз сброс/назад, два раза подряд — выход O_0
                 if key.code == KeyCode::Esc {
                     let now = Instant::now();
                     let is_double_esc = if let Some(last) = app.last_esc_press {
@@ -556,7 +606,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                     match app.mode {
                         AppMode::Typing => app.reset_test(),
-                        AppMode::Result | AppMode::Settings | AppMode::HistoryView => {
+                        AppMode::Result | AppMode::Settings | AppMode::HistoryView | AppMode::Languages => {
                             app.mode = AppMode::Typing;
                             app.reset_test();
                         }
@@ -571,7 +621,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         if last_tick.elapsed() >= tick_rate {
             last_tick = Instant::now();
             if app.mode == AppMode::Typing && app.start_time.is_some() {
-                // раз в секунду замеряем wpm для графика
                 let elapsed_sec = app.start_time.unwrap().elapsed().as_secs();
                 if elapsed_sec > app.last_sample_sec {
                     app.last_sample_sec = elapsed_sec;
@@ -618,17 +667,18 @@ fn ui(f: &mut Frame, app: &App) {
             render_bottom_bar(f, app, outer[1]);
         }
         AppMode::Settings => render_settings_view(f, app, size),
+        AppMode::Languages => render_languages_view(f, app, size),
         AppMode::Result => render_minimal_result(f, app, size),
         AppMode::HistoryView => render_minimal_history(f, app, size),
     }
 }
 
-// верхняя информационная строка
+// верхняя информационная строка с ч/б юникод символами
 fn render_top_bar(f: &mut Frame, app: &App, area: Rect) {
     let time_left = app.time_remaining().as_secs();
     let accent = app.theme_accent();
 
-    let mut mode_str = app.practice_mode.name().to_string();
+    let mut mode_str = app.active_lang.clone();
     if app.store.config.punctuation {
         mode_str.push_str("+punc");
     }
@@ -680,7 +730,6 @@ fn render_single_line_stream(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    // фиксируем курсор на 35% ширины экрана, как на конвейере
     let center_pos = (width as f32 * 0.35) as usize;
     let typed_idx = app.typed_chars.len();
     let accent = app.theme_accent();
@@ -702,12 +751,10 @@ fn render_single_line_stream(f: &mut Frame, app: &App, area: Rect) {
         let target_c = app.target_chars[i];
 
         if i < typed_idx {
-            // уже набранные символы
             let typed_c = app.typed_chars[i];
             let dist_from_cursor = typed_idx - i;
 
             if typed_c == target_c {
-                // плавный фейд влево :3
                 let color = match visual_style {
                     VisualStyle::Minimal => Color::Rgb(50, 50, 50),
                     _ => {
@@ -722,7 +769,6 @@ fn render_single_line_stream(f: &mut Frame, app: &App, area: Rect) {
                 };
                 spans.push(Span::styled(target_c.to_string(), Style::default().fg(color)));
             } else {
-                // опечатка подсвечивается красным
                 let display = if target_c == ' ' { "·" } else { &target_c.to_string() };
                 spans.push(Span::styled(
                     display.to_string(),
@@ -730,7 +776,6 @@ fn render_single_line_stream(f: &mut Frame, app: &App, area: Rect) {
                 ));
             }
         } else if i == typed_idx {
-            // активный курсор под стиль
             match visual_style {
                 VisualStyle::Tape => {
                     spans.push(Span::styled(
@@ -758,7 +803,6 @@ fn render_single_line_stream(f: &mut Frame, app: &App, area: Rect) {
                 }
             }
         } else {
-            // будущие буквы, затухающие вправо
             let dist_ahead = i - typed_idx;
             let color = match visual_style {
                 VisualStyle::Minimal => {
@@ -793,36 +837,39 @@ fn render_single_line_stream(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(p, area);
 }
 
-// аккуратная строка хоткеев в самом низу экрана
+// аккуратная строка хоткеев в самом низу экрана (чистый ч/б юникод)
 fn render_bottom_bar(f: &mut Frame, _app: &App, area: Rect) {
     let hints = vec![
-        Span::styled(" ↵ ", Style::default().fg(Color::Rgb(120, 120, 120))),
-        Span::styled("tab", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled(" ↵ ", Style::default().fg(Color::Rgb(140, 140, 140))),
+        Span::styled("tab", Style::default().fg(Color::Rgb(90, 90, 90))),
         Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
-        Span::styled("◈ ", Style::default().fg(Color::Rgb(120, 120, 120))),
-        Span::styled("f1", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("◈ ", Style::default().fg(Color::Rgb(140, 140, 140))),
+        Span::styled("f1", Style::default().fg(Color::Rgb(90, 90, 90))),
         Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
-        Span::styled("◷ ", Style::default().fg(Color::Rgb(120, 120, 120))),
-        Span::styled("f2", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("◷ ", Style::default().fg(Color::Rgb(140, 140, 140))),
+        Span::styled("f2", Style::default().fg(Color::Rgb(90, 90, 90))),
         Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
-        Span::styled("▤ ", Style::default().fg(Color::Rgb(120, 120, 120))),
-        Span::styled("f3", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("▤ ", Style::default().fg(Color::Rgb(140, 140, 140))),
+        Span::styled("f3", Style::default().fg(Color::Rgb(90, 90, 90))),
         Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
-        Span::styled("⚙ ", Style::default().fg(Color::Rgb(120, 120, 120))),
-        Span::styled("f4", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("⚙ ", Style::default().fg(Color::Rgb(140, 140, 140))),
+        Span::styled("f4", Style::default().fg(Color::Rgb(90, 90, 90))),
         Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
-        Span::styled("⎋ ", Style::default().fg(Color::Rgb(120, 120, 120))),
-        Span::styled("esc (x2 quit)", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("◧ ", Style::default().fg(Color::Rgb(140, 140, 140))),
+        Span::styled("f5", Style::default().fg(Color::Rgb(90, 90, 90))),
+        Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
+        Span::styled("⎋ ", Style::default().fg(Color::Rgb(140, 140, 140))),
+        Span::styled("esc (x2 quit)", Style::default().fg(Color::Rgb(90, 90, 90))),
     ];
     let p = Paragraph::new(Line::from(hints)).alignment(Alignment::Center);
     f.render_widget(p, area);
 }
 
-// меню настроек
+// меню настроек с чистыми ч/б юникод символами
 fn render_settings_view(f: &mut Frame, app: &App, size: Rect) {
     let v = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Fill(1), Constraint::Length(18), Constraint::Fill(1)])
+        .constraints([Constraint::Fill(1), Constraint::Length(20), Constraint::Fill(1)])
         .split(size);
 
     let accent = app.theme_accent();
@@ -840,6 +887,7 @@ fn render_settings_view(f: &mut Frame, app: &App, size: Rect) {
         ("☠  sudden death", if app.store.config.sudden_death { "on" } else { "off" }),
         ("🎨 theme", app.store.config.theme.name()),
         ("❖  style", app.store.config.visual.name()),
+        ("◧  mirror cdn", app.store.config.mirror.name()),
     ];
 
     for (idx, (label, val)) in items.iter().enumerate() {
@@ -865,7 +913,83 @@ fn render_settings_view(f: &mut Frame, app: &App, size: Rect) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "↑ / ↓ navigate   •   ␣ / ↵ toggle   •   ⎋ / ↹ return",
+        "↑ / ↓ navigate   •   ␣ / ↵ toggle   •   ◧ f5 languages   •   ⎋ / ↹ return",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let p = Paragraph::new(lines).alignment(Alignment::Center);
+    f.render_widget(p, v[1]);
+}
+
+// меню языков (Blind Typing / Monkeytype 1k, 2k, 10k) с выбором зеркал
+fn render_languages_view(f: &mut Frame, app: &App, size: Rect) {
+    let accent = app.theme_accent();
+    let v = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Fill(1), Constraint::Length(22), Constraint::Fill(1)])
+        .split(size);
+
+    let mut lines = Vec::new();
+
+    lines.push(Line::from(vec![
+        Span::styled("◧  languages & wordlists", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+        Span::styled("  //  mirror: ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("[{}]", app.store.config.mirror.name()), Style::default().fg(Color::White)),
+        Span::styled(" (press 'm' to switch)", Style::default().fg(Color::Rgb(90, 90, 90))),
+    ]));
+    lines.push(Line::from(Span::styled("────────────────────────────────────────────────────────────────", Style::default().fg(Color::Rgb(50, 50, 50)))));
+
+    if let Some(msg) = &app.lang_status_msg {
+        lines.push(Line::from(Span::styled(msg, Style::default().fg(accent))));
+    } else {
+        lines.push(Line::from(""));
+    }
+
+    let page_size = 12;
+    let total = app.lang_manager.items.len();
+    let start_idx = (app.lang_cursor / page_size) * page_size;
+    let end_idx = (start_idx + page_size).min(total);
+
+    for idx in start_idx..end_idx {
+        let item = &app.lang_manager.items[idx];
+        let is_selected = idx == app.lang_cursor;
+        let is_active = app.active_lang == item.id;
+        let is_installed = app.lang_manager.is_installed(&item.id);
+
+        let prefix = if is_selected { " → " } else { "   " };
+        let status = if is_active {
+            "● active"
+        } else if is_installed {
+            "✓ installed"
+        } else {
+            "↓ download"
+        };
+
+        let style_label = if is_selected {
+            Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Rgb(150, 150, 150))
+        };
+
+        let style_status = if is_active {
+            Style::default().fg(accent).add_modifier(Modifier::BOLD)
+        } else if is_installed {
+            Style::default().fg(Color::Rgb(180, 180, 180))
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(prefix, Style::default().fg(accent)),
+            Span::styled(format!("{:<26} ", item.name), style_label),
+            Span::styled(format!("{:<6} words   ", item.words_count), Style::default().fg(Color::Rgb(90, 90, 90))),
+            Span::styled(format!("[{}]", status), style_status),
+        ]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "↑ / ↓ scroll   •   ↵ select / download   •   'm' switch mirror   •   ⎋ back",
         Style::default().fg(Color::DarkGray),
     )));
 
@@ -923,6 +1047,8 @@ fn render_minimal_result(f: &mut Frame, app: &App, size: Rect) {
             Span::styled(" retry     ", Style::default().fg(Color::DarkGray)),
             Span::styled("⚙ f4", Style::default().fg(accent)),
             Span::styled(" config     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("◧ f5", Style::default().fg(accent)),
+            Span::styled(" langs     ", Style::default().fg(Color::DarkGray)),
             Span::styled("▤ f3", Style::default().fg(accent)),
             Span::styled(" stats     ", Style::default().fg(Color::DarkGray)),
             Span::styled("⎋ esc", Style::default().fg(accent)),
@@ -951,23 +1077,26 @@ fn render_minimal_history(f: &mut Frame, app: &App, size: Rect) {
     )));
 
     if app.store.results.is_empty() {
-        lines.push(Line::from(Span::styled("no records yet ):", Style::default().fg(Color::DarkGray))));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled("  no tests completed yet.", Style::default().fg(Color::DarkGray))));
     } else {
         for res in app.store.results.iter().rev().take(8) {
+            let date_str = res.date.format("%m-%d %H:%M").to_string();
+            let mode_str = format!("{:.11}", res.mode_name);
             lines.push(Line::from(vec![
-                Span::styled(format!("{:<16} ", res.date.format("%m-%d %H:%M")), Style::default().fg(Color::Rgb(100, 100, 100))),
-                Span::styled(format!("{:<12} ", res.mode_name), Style::default().fg(Color::Rgb(140, 140, 140))),
-                Span::styled(format!("{}s    ", res.duration_secs), Style::default().fg(Color::Rgb(100, 100, 100))),
-                Span::styled(format!("{:<8.0} ", res.wpm), Style::default().fg(accent)),
-                Span::styled(format!("{:<8.0} ", res.cpm), Style::default().fg(Color::Rgb(150, 150, 150))),
-                Span::styled(format!("{:.1}%", res.accuracy), Style::default().fg(Color::White)),
+                Span::styled(format!("{:<16} ", date_str), Style::default().fg(Color::Rgb(100, 100, 100))),
+                Span::styled(format!("{:<12} ", mode_str), Style::default().fg(Color::White)),
+                Span::styled(format!("{:<6} ", format!("{}s", res.duration_secs)), Style::default().fg(Color::Rgb(120, 120, 120))),
+                Span::styled(format!("{:<8.0} ", res.wpm), Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+                Span::styled(format!("{:<8.0} ", res.cpm), Style::default().fg(Color::Rgb(140, 140, 140))),
+                Span::styled(format!("{:<7.1}%", res.accuracy), Style::default().fg(Color::White)),
             ]));
         }
     }
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "press esc or tab to return",
+        "⎋ esc / ↵ return",
         Style::default().fg(Color::DarkGray),
     )));
 
