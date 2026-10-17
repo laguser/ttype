@@ -408,8 +408,7 @@ impl App {
                                 DownloadSource::Moscow => DownloadSource::Germany,
                                 DownloadSource::Germany => DownloadSource::JsDelivr,
                                 DownloadSource::JsDelivr => DownloadSource::GitHub,
-                                DownloadSource::GitHub => DownloadSource::CloudflareR2,
-                                DownloadSource::CloudflareR2 => DownloadSource::Moscow,
+                                DownloadSource::GitHub => DownloadSource::Moscow,
                             };
                         }
                         _ => {}
@@ -438,8 +437,7 @@ impl App {
                         DownloadSource::Moscow => DownloadSource::Germany,
                         DownloadSource::Germany => DownloadSource::JsDelivr,
                         DownloadSource::JsDelivr => DownloadSource::GitHub,
-                        DownloadSource::GitHub => DownloadSource::CloudflareR2,
-                        DownloadSource::CloudflareR2 => DownloadSource::Moscow,
+                        DownloadSource::GitHub => DownloadSource::Moscow,
                     };
                     self.store.save();
                 }

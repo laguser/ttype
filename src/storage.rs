@@ -54,11 +54,10 @@ impl ThemeColor {
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
 pub enum DownloadSource {
     #[default]
-    Moscow,        // msc-1 VPS (Россия)
-    Germany,       // de-1 VPS (Европа)
-    JsDelivr,      // jsDelivr Global Edge CDN
-    GitHub,        // GitHub Raw CDN
-    CloudflareR2,  // Cloudflare R2 / Custom CDN
+    Moscow,    // msc-1 VPS (Россия)
+    Germany,   // de-1 VPS (Европа)
+    JsDelivr,  // jsDelivr Global Edge CDN
+    GitHub,    // GitHub Raw CDN
 }
 
 impl DownloadSource {
@@ -68,7 +67,6 @@ impl DownloadSource {
             DownloadSource::Germany => "germany (vps)",
             DownloadSource::JsDelivr => "jsdelivr (fast cdn)",
             DownloadSource::GitHub => "github (raw)",
-            DownloadSource::CloudflareR2 => "cloudflare (r2)",
         }
     }
 
@@ -78,7 +76,6 @@ impl DownloadSource {
             DownloadSource::Germany => "http://31.76.11.45:8089/ttype/dicts",
             DownloadSource::JsDelivr => "https://cdn.jsdelivr.net/gh/laguser/ttype@main/dicts",
             DownloadSource::GitHub => "https://raw.githubusercontent.com/laguser/ttype/main/dicts",
-            DownloadSource::CloudflareR2 => "https://pub-ttype.r2.dev/dicts",
         }
     }
 }

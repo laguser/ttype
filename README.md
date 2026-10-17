@@ -37,7 +37,7 @@ A keyboard-first, distraction-free typing speed test built for terminal purists.
   - Epic literature collections: 1200+ quotes from *War & Peace* in Russian and 6400+ quotes in English.
   - Instant one-key deletion (`d` or `del`).
   - Real-time download progress bar.
-- **Multi-CDN Mirror Switcher:** Fast global downloads via `moscow (vps)`, `germany (vps)`, `jsdelivr (fast edge cdn)`, `github (raw)`, or `cloudflare (r2)`.
+- **Multi-CDN Mirror Switcher:** Fast global downloads via `moscow (vps)`, `germany (vps)`, `jsdelivr (fast edge cdn)`, or `github (raw)`.
 - **Configurable Tests:** 15s / 30s timers, punctuation, numbers, and hardcore sudden death mode.
 - **Local Stats & Sparkline:** Tracks WPM, CPM, accuracy, mistakes, and draws a real-time WPM sparkline chart per test.
 - **Themes & Styles:** `auto (term)`, `catppuccin`, `tokyo night`, `nord`, `gruvbox`, `dracula`, `amber`, `white` across 4 cursor styles (`tape`, `underline`, `blocky`, `minimal`).
@@ -96,7 +96,7 @@ cp target/release/ttype ~/.local/bin/
   - Избранные цитаты из классики: 1160+ цитат из «Войны и мира» Льва Толстого на русском и 6480+ цитат на английском.
   - Удаление словарей в одно нажатие (`d` / `del`).
   - Ч/Б прогресс-бар скачивания `[■■■■□□□□]`.
-- **Сеть зеркал загрузки:** Быстрое переключение серверов на лету (`moscow vps`, `germany vps`, `jsdelivr cdn`, `github raw`, `cloudflare r2`).
+- **Сеть зеркал загрузки:** Быстрое переключение серверов на лету (`moscow vps`, `germany vps`, `jsdelivr cdn`, `github raw`).
 - **Гибкая настройка:** Таймеры 15с / 30с, знаки препинания, цифры и режим внезапной смерти (`sudden death`).
 - **Локальная история и график:** Сохранение результатов в `~/.ttype/history.json` с выводом спарклайн-графика скорости (` ▂▃▅▆▇█`).
 - **Стили и темы:** Адаптация `auto (term)`, а также `catppuccin`, `tokyo night`, `nord`, `gruvbox` и 4 стиля курсора.
@@ -132,7 +132,7 @@ cp target/release/ttype ~/.local/bin/
 | `f4` | Настройки |
 | `f5` | Меню языков и CDN-зеркал |
 | `d` / `del` *(в F5)* | Удалить скачанный словарь |
-| `m` *(в F5)* | Переключить зеркало загрузки (Москва / Германия / jsDelivr / GitHub / Cloudflare) |
+| `m` *(в F5)* | Переключить зеркало загрузки (Москва / Германия / jsDelivr / GitHub) |
 | `esc` | Сброс / Возврат к печати |
 | `esc esc` / `ctrl+c` | Выход |
 
