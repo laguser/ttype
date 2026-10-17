@@ -636,10 +636,10 @@ fn render_top_bar(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let mut spans = vec![
-        Span::styled(mode_str, Style::default().fg(accent)),
-        Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),
-        Span::styled(format!("{}s", app.duration as u64), Style::default().fg(Color::White)),
-        Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("◈ {}", mode_str), Style::default().fg(accent)),
+        Span::styled("  •  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("◷ {}s", app.duration as u64), Style::default().fg(Color::White)),
+        Span::styled("  •  ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             format!("{:02}s", time_left),
             Style::default()
@@ -656,13 +656,13 @@ fn render_top_bar(f: &mut Frame, app: &App, area: Rect) {
 
     if app.store.config.live_wpm && app.start_time.is_some() {
         let live_wpm = app.current_wpm();
-        spans.push(Span::styled("  ·  ", Style::default().fg(Color::DarkGray)));
-        spans.push(Span::styled(format!("{:.0} wpm", live_wpm), Style::default().fg(Color::Rgb(130, 130, 130))));
+        spans.push(Span::styled("  •  ", Style::default().fg(Color::DarkGray)));
+        spans.push(Span::styled(format!("⚡ {:.0} wpm", live_wpm), Style::default().fg(Color::Rgb(130, 130, 130))));
     }
 
     if app.store.config.sound_enabled {
-        spans.push(Span::styled("  ·  ", Style::default().fg(Color::DarkGray)));
-        spans.push(Span::styled("audio", Style::default().fg(Color::Rgb(90, 90, 90))));
+        spans.push(Span::styled("  •  ", Style::default().fg(Color::DarkGray)));
+        spans.push(Span::styled("♪", Style::default().fg(Color::Rgb(110, 110, 110))));
     }
 
     let p = Paragraph::new(Line::from(spans)).alignment(Alignment::Center);
@@ -792,20 +792,23 @@ fn render_single_line_stream(f: &mut Frame, app: &App, area: Rect) {
 // аккуратная строка хоткеев в самом низу экрана
 fn render_bottom_bar(f: &mut Frame, _app: &App, area: Rect) {
     let hints = vec![
-        Span::styled("tab", Style::default().fg(Color::Rgb(95, 95, 95))),
-        Span::styled(" restart    ", Style::default().fg(Color::Rgb(50, 50, 50))),
-        Span::styled("f1", Style::default().fg(Color::Rgb(95, 95, 95))),
-        Span::styled(" mode    ", Style::default().fg(Color::Rgb(50, 50, 50))),
-        Span::styled("f2", Style::default().fg(Color::Rgb(95, 95, 95))),
-        Span::styled(" time    ", Style::default().fg(Color::Rgb(50, 50, 50))),
-        Span::styled("f3", Style::default().fg(Color::Rgb(95, 95, 95))),
-        Span::styled(" stats    ", Style::default().fg(Color::Rgb(50, 50, 50))),
-        Span::styled("f4", Style::default().fg(Color::Rgb(95, 95, 95))),
-        Span::styled(" config    ", Style::default().fg(Color::Rgb(50, 50, 50))),
-        Span::styled("esc", Style::default().fg(Color::Rgb(95, 95, 95))),
-        Span::styled(" restart    ", Style::default().fg(Color::Rgb(50, 50, 50))),
-        Span::styled("esc esc", Style::default().fg(Color::Rgb(95, 95, 95))),
-        Span::styled(" quit", Style::default().fg(Color::Rgb(50, 50, 50))),
+        Span::styled(" ↵ ", Style::default().fg(Color::Rgb(120, 120, 120))),
+        Span::styled("tab", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
+        Span::styled("◈ ", Style::default().fg(Color::Rgb(120, 120, 120))),
+        Span::styled("f1", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
+        Span::styled("◷ ", Style::default().fg(Color::Rgb(120, 120, 120))),
+        Span::styled("f2", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
+        Span::styled("▤ ", Style::default().fg(Color::Rgb(120, 120, 120))),
+        Span::styled("f3", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
+        Span::styled("⚙ ", Style::default().fg(Color::Rgb(120, 120, 120))),
+        Span::styled("f4", Style::default().fg(Color::Rgb(80, 80, 80))),
+        Span::styled("   •   ", Style::default().fg(Color::Rgb(40, 40, 40))),
+        Span::styled("⎋ ", Style::default().fg(Color::Rgb(120, 120, 120))),
+        Span::styled("esc (x2 quit)", Style::default().fg(Color::Rgb(80, 80, 80))),
     ];
     let p = Paragraph::new(Line::from(hints)).alignment(Alignment::Center);
     f.render_widget(p, area);
@@ -821,23 +824,23 @@ fn render_settings_view(f: &mut Frame, app: &App, size: Rect) {
     let accent = app.theme_accent();
     let mut lines = Vec::new();
 
-    lines.push(Line::from(Span::styled("settings", Style::default().fg(accent).add_modifier(Modifier::BOLD))));
-    lines.push(Line::from(Span::styled("────────", Style::default().fg(Color::Rgb(50, 50, 50)))));
+    lines.push(Line::from(Span::styled("⚙  settings", Style::default().fg(accent).add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(Span::styled("────────────", Style::default().fg(Color::Rgb(50, 50, 50)))));
     lines.push(Line::from(""));
 
     let items = [
-        ("sound effects", if app.store.config.sound_enabled { "on" } else { "off" }),
-        ("punctuation", if app.store.config.punctuation { "on" } else { "off" }),
-        ("numbers", if app.store.config.numbers { "on" } else { "off" }),
-        ("live wpm", if app.store.config.live_wpm { "on" } else { "off" }),
-        ("sudden death", if app.store.config.sudden_death { "on" } else { "off" }),
-        ("theme", app.store.config.theme.name()),
-        ("style", app.store.config.visual.name()),
+        ("♪  sound effects", if app.store.config.sound_enabled { "on" } else { "off" }),
+        ("•  punctuation", if app.store.config.punctuation { "on" } else { "off" }),
+        ("№  numbers", if app.store.config.numbers { "on" } else { "off" }),
+        ("⚡  live wpm", if app.store.config.live_wpm { "on" } else { "off" }),
+        ("☠  sudden death", if app.store.config.sudden_death { "on" } else { "off" }),
+        ("🎨 theme", app.store.config.theme.name()),
+        ("❖  style", app.store.config.visual.name()),
     ];
 
     for (idx, (label, val)) in items.iter().enumerate() {
         let is_selected = idx == app.settings_cursor;
-        let prefix = if is_selected { " > " } else { "   " };
+        let prefix = if is_selected { " → " } else { "   " };
         let style_label = if is_selected {
             Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
         } else {
@@ -851,14 +854,14 @@ fn render_settings_view(f: &mut Frame, app: &App, size: Rect) {
 
         lines.push(Line::from(vec![
             Span::styled(prefix, Style::default().fg(accent)),
-            Span::styled(format!("{:<20} ", label), style_label),
+            Span::styled(format!("{:<22} ", label), style_label),
             Span::styled(format!("[{}]", val), style_val),
         ]));
     }
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "↑ / ↓ navigate   ·   space / enter toggle   ·   esc / tab return",
+        "↑ / ↓ navigate   •   ␣ / ↵ toggle   •   ⎋ / ↹ return",
         Style::default().fg(Color::DarkGray),
     )));
 
@@ -901,26 +904,24 @@ fn render_minimal_result(f: &mut Frame, app: &App, size: Rect) {
 
         let detail_line = Line::from(vec![
             Span::styled(format!("{} cpm", res.cpm as u64), Style::default().fg(Color::Rgb(120, 120, 120))),
-            Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("  •  ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 format!("{} err", res.incorrect_chars),
                 Style::default().fg(if res.incorrect_chars > 0 { Color::Red } else { Color::DarkGray }),
             ),
-            Span::styled("  ·  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("  •  ", Style::default().fg(Color::DarkGray)),
             Span::styled(format!("{} / {}s", res.mode_name, res.duration_secs), Style::default().fg(Color::Rgb(120, 120, 120))),
         ]);
         f.render_widget(Paragraph::new(detail_line).alignment(Alignment::Center), v[4]);
 
         let act_line = Line::from(vec![
-            Span::styled("tab", Style::default().fg(accent)),
-            Span::styled(" retry    ", Style::default().fg(Color::DarkGray)),
-            Span::styled("f4", Style::default().fg(accent)),
-            Span::styled(" config    ", Style::default().fg(Color::DarkGray)),
-            Span::styled("f3", Style::default().fg(accent)),
-            Span::styled(" stats    ", Style::default().fg(Color::DarkGray)),
-            Span::styled("esc", Style::default().fg(accent)),
-            Span::styled(" restart    ", Style::default().fg(Color::DarkGray)),
-            Span::styled("esc esc", Style::default().fg(accent)),
+            Span::styled("↵ tab", Style::default().fg(accent)),
+            Span::styled(" retry     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("⚙ f4", Style::default().fg(accent)),
+            Span::styled(" config     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("▤ f3", Style::default().fg(accent)),
+            Span::styled(" stats     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("⎋ esc", Style::default().fg(accent)),
             Span::styled(" quit", Style::default().fg(Color::DarkGray)),
         ]);
         f.render_widget(Paragraph::new(act_line).alignment(Alignment::Center), v[6]);

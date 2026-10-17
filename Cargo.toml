@@ -1,7 +1,19 @@
 [package]
-name = "ttype"
+name = "ttype-cli"
 version = "0.1.0"
 edition = "2021"
+authors = ["laguser <laguser@users.noreply.github.com>"]
+description = "Minimalist terminal typing speed test in Rust. Smooth conveyor tape, procedural mechanical typewriter sounds, and clean transparent UI."
+license = "MIT"
+repository = "https://github.com/laguser/ttype"
+homepage = "https://github.com/laguser/ttype"
+readme = "README.md"
+keywords = ["typing-test", "terminal", "tui", "typewriter", "cli"]
+categories = ["command-line-utilities", "games"]
+
+[[bin]]
+name = "ttype"
+path = "src/main.rs"
 
 [dependencies]
 ratatui = "0.29"
