@@ -10,11 +10,9 @@
   <img src="https://img.shields.io/github/license/laguser/ttype?style=flat-square&color=blue" alt="License">
 </p>
 
-```text
-                           ◈ ru · ◷ 15s · 11s · ⚡ 94 wpm
-     ...быстро точно фокус [в] е ч е р   к о ф е   р а б о т а...
-           ↵ tab restart   ◈ f1 mode   ◷ f2 time   ▤ f3 stats   ⚙ f4 config
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/laguser/ttype/main/demo.gif" alt="ttype demo" width="750">
+</p>
 
 <p align="center">
   <a href="#english">English</a> • <a href="#русский">Русский</a>
