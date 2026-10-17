@@ -1,0 +1,25 @@
+# Maintainer: laguser <https://github.com/laguser>
+pkgname=ttype-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Minimalist terminal typing speed test with conveyor tape & mechanical typewriter soundscapes"
+arch=('x86_64')
+url="https://github.com/laguser/ttype"
+license=('MIT')
+depends=('alsa-lib')
+provides=('ttype')
+conflicts=('ttype')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "ttype-$pkgver"
+  cargo build --release --locked
+}
+
+package() {
+  cd "ttype-$pkgver"
+  install -Dm755 "target/release/ttype" "$pkgdir/usr/bin/ttype"
+  install -Dm644 "README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 "LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
