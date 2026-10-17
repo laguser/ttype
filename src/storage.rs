@@ -51,11 +51,12 @@ impl ThemeColor {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
 pub enum DownloadSource {
-    Moscow,   // 🇷🇺 msc-1 VPS
-    Germany,  // 🇩🇪 de-1 VPS
-    GitHub,   // 🐙 GitHub CDN
+    #[default]
+    Moscow,   // msc-1 VPS
+    Germany,  // de-1 VPS
+    GitHub,   // GitHub CDN
 }
 
 impl DownloadSource {
@@ -90,12 +91,6 @@ pub struct Config {
     pub mirror: DownloadSource,
     #[serde(default)]
     pub active_lang: String,
-}
-
-impl Default for DownloadSource {
-    fn default() -> Self {
-        DownloadSource::Moscow
-    }
 }
 
 impl Default for Config {

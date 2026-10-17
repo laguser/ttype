@@ -51,6 +51,7 @@ pub struct App {
     pub lang_cursor: usize,
     pub lang_manager: LangManager,
     pub lang_status_msg: Option<String>,
+    pub download_progress: Option<f64>, // Some(0.0..1.0)
     pub target_chars: Vec<char>,
     pub typed_chars: Vec<char>,
     pub start_time: Option<Instant>,
@@ -84,6 +85,7 @@ impl App {
             lang_cursor: 0,
             lang_manager,
             lang_status_msg: None,
+            download_progress: None,
             target_chars: Vec::new(),
             typed_chars: Vec::new(),
             start_time: None,
@@ -437,6 +439,29 @@ impl App {
                     };
                     self.store.save();
                 }
+                KeyCode::Char('d') | KeyCode::Delete | KeyCode::Backspace => {
+                    if let Some(dicts_dir) = DataStore::dicts_dir() {
+                        let item = self.lang_manager.items[self.lang_cursor].clone();
+                        let is_inst = self.lang_manager.is_installed(&item.id);
+                        if is_inst {
+                            match self.lang_manager.delete_dict(&dicts_dir, &item.id) {
+                                Ok(_) => {
+                                    if self.active_lang == item.id {
+                                        self.active_lang = "en".to_string();
+                                        self.store.config.active_lang = "en".to_string();
+                                        self.store.save();
+                                    }
+                                    self.lang_status_msg = Some(format!("✕ deleted: {}", item.name));
+                                }
+                                Err(e) => {
+                                    self.lang_status_msg = Some(format!("✕ failed to delete: {}", e));
+                                }
+                            }
+                        } else {
+                            self.lang_status_msg = Some(format!("◈ not installed: {}", item.name));
+                        }
+                    }
+                }
                 KeyCode::Enter | KeyCode::Char(' ') => {
                     if let Some(dicts_dir) = DataStore::dicts_dir() {
                         let item = self.lang_manager.items[self.lang_cursor].clone();
@@ -448,16 +473,26 @@ impl App {
                             self.store.config.active_lang = item.id;
                             self.store.save();
                             self.lang_status_msg = Some(format!("◈ selected: {}", item.name));
+                            self.download_progress = None;
                         } else {
                             self.lang_status_msg = Some(format!("◷ downloading {}...", item.name));
-                            match self.lang_manager.download_dict(&dicts_dir, base_url, &item) {
+                            self.download_progress = Some(0.0);
+                            let mut last_pct = 0.0;
+                            let res = self.lang_manager.download_dict(&dicts_dir, base_url, &item, |_dl, total| {
+                                if total > 0 {
+                                    last_pct = (_dl as f64 / total as f64).min(1.0);
+                                }
+                            });
+                            match res {
                                 Ok(_) => {
+                                    self.download_progress = None;
                                     self.active_lang = item.id.clone();
                                     self.store.config.active_lang = item.id;
                                     self.store.save();
                                     self.lang_status_msg = Some(format!("✓ installed & activated: {}", item.name));
                                 }
                                 Err(e) => {
+                                    self.download_progress = None;
                                     self.lang_status_msg = Some(format!("✕ failed: {}", e));
                                 }
                             }
@@ -939,7 +974,16 @@ fn render_languages_view(f: &mut Frame, app: &App, size: Rect) {
     ]));
     lines.push(Line::from(Span::styled("────────────────────────────────────────────────────────────────", Style::default().fg(Color::Rgb(50, 50, 50)))));
 
-    if let Some(msg) = &app.lang_status_msg {
+    if let Some(pct) = app.download_progress {
+        let width = 24;
+        let filled = ((pct * width as f64).round() as usize).min(width);
+        let empty = width.saturating_sub(filled);
+        let bar = format!("[{}{}] {:.0}%", "■".repeat(filled), "□".repeat(empty), pct * 100.0);
+        lines.push(Line::from(vec![
+            Span::styled("◷ downloading: ", Style::default().fg(accent)),
+            Span::styled(bar, Style::default().fg(Color::White)),
+        ]));
+    } else if let Some(msg) = &app.lang_status_msg {
         lines.push(Line::from(Span::styled(msg, Style::default().fg(accent))));
     } else {
         lines.push(Line::from(""));
@@ -989,7 +1033,7 @@ fn render_languages_view(f: &mut Frame, app: &App, size: Rect) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "↑ / ↓ scroll   •   ↵ select / download   •   'm' switch mirror   •   ⎋ back",
+        "↑ / ↓ scroll   •   ↵ select / download   •   'd' / del delete   •   'm' switch mirror   •   ⎋ back",
         Style::default().fg(Color::DarkGray),
     )));
 
