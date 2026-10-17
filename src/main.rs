@@ -406,8 +406,10 @@ impl App {
                         7 => {
                             self.store.config.mirror = match self.store.config.mirror {
                                 DownloadSource::Moscow => DownloadSource::Germany,
-                                DownloadSource::Germany => DownloadSource::GitHub,
-                                DownloadSource::GitHub => DownloadSource::Moscow,
+                                DownloadSource::Germany => DownloadSource::JsDelivr,
+                                DownloadSource::JsDelivr => DownloadSource::GitHub,
+                                DownloadSource::GitHub => DownloadSource::CloudflareR2,
+                                DownloadSource::CloudflareR2 => DownloadSource::Moscow,
                             };
                         }
                         _ => {}
@@ -434,8 +436,10 @@ impl App {
                 KeyCode::Char('m') | KeyCode::Tab => {
                     self.store.config.mirror = match self.store.config.mirror {
                         DownloadSource::Moscow => DownloadSource::Germany,
-                        DownloadSource::Germany => DownloadSource::GitHub,
-                        DownloadSource::GitHub => DownloadSource::Moscow,
+                        DownloadSource::Germany => DownloadSource::JsDelivr,
+                        DownloadSource::JsDelivr => DownloadSource::GitHub,
+                        DownloadSource::GitHub => DownloadSource::CloudflareR2,
+                        DownloadSource::CloudflareR2 => DownloadSource::Moscow,
                     };
                     self.store.save();
                 }
