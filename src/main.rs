@@ -558,7 +558,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     while i < args.len() {
         match args[i].as_str() {
             "-h" | "--help" => {
-                println!("ttype 0.1.0 — minimalist terminal typing speed test\n");
+                println!("ttype {} — minimalist terminal typing speed test\n", env!("CARGO_PKG_VERSION"));
                 println!("USAGE:");
                 println!("  ttype [OPTIONS]\n");
                 println!("OPTIONS:");
@@ -578,7 +578,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 return Ok(());
             }
             "-v" | "--version" => {
-                println!("ttype 0.1.0");
+                println!("ttype {}", env!("CARGO_PKG_VERSION"));
                 return Ok(());
             }
             "-m" | "--mode" if i + 1 < args.len() => {
