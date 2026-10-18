@@ -1,1 +1,8 @@
 /target
+shorts/
+shorts_bw/
+squashfs-root/
+*.tape
+gen_*.py
+deploy_*.py
+fetch_*.py
