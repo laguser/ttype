@@ -1,6 +1,6 @@
 [package]
 name = "ttype-cli"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["laguser <laguser@users.noreply.github.com>"]
 description = "Minimalist terminal typing speed test in Rust. Smooth conveyor tape, procedural mechanical typewriter sounds, and clean transparent UI."

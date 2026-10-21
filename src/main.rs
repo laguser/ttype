@@ -172,8 +172,9 @@ impl App {
                             last_word = w.clone();
                             let mut word = w.clone();
                             if self.store.config.punctuation && rng.gen_bool(0.25) {
-                                let punc = [",", ".", "!", "?", " -", ";", ":"].choose(&mut rng).unwrap();
-                                word.push_str(punc);
+                                if let Some(&punc) = [",", ".", "!", "?", " -", ";", ":"].choose(&mut rng) {
+                                    word.push_str(punc);
+                                }
                             }
                             if self.store.config.numbers && rng.gen_bool(0.12) {
                                 let num = rng.gen_range(0..100);
@@ -201,8 +202,9 @@ impl App {
 
                 let mut word = w.to_string();
                 if self.store.config.punctuation && rng.gen_bool(0.25) {
-                    let punc = [",", ".", "!", "?", " -", ";", ":"].choose(&mut rng).unwrap();
-                    word.push_str(punc);
+                    if let Some(&punc) = [",", ".", "!", "?", " -", ";", ":"].choose(&mut rng) {
+                        word.push_str(punc);
+                    }
                 }
                 if self.store.config.numbers && rng.gen_bool(0.12) {
                     let num = rng.gen_range(0..100);
@@ -657,15 +659,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         if last_tick.elapsed() >= tick_rate {
             last_tick = Instant::now();
-            if app.mode == AppMode::Typing && app.start_time.is_some() {
-                let elapsed_sec = app.start_time.unwrap().elapsed().as_secs();
-                if elapsed_sec > app.last_sample_sec {
-                    app.last_sample_sec = elapsed_sec;
-                    app.wpm_samples.push(app.current_wpm() as u64);
-                }
+            if app.mode == AppMode::Typing {
+                if let Some(start) = app.start_time {
+                    let elapsed_sec = start.elapsed().as_secs();
+                    if elapsed_sec > app.last_sample_sec {
+                        app.last_sample_sec = elapsed_sec;
+                        app.wpm_samples.push(app.current_wpm() as u64);
+                    }
 
-                if app.time_remaining() == Duration::ZERO {
-                    app.finish_test();
+                    if app.time_remaining() == Duration::ZERO {
+                        app.finish_test();
+                    }
                 }
             }
         }
