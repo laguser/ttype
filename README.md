@@ -26,8 +26,12 @@ minimalist terminal typing speed test
 cargo install ttype-cli
 ```
 
+#### From Source
 ```bash
-curl -sSL https://raw.githubusercontent.com/laguser/ttype/main/install.sh | bash
+git clone https://github.com/laguser/ttype.git
+cd ttype
+cargo build --release
+install -m 755 target/release/ttype ~/.local/bin/
 ```
 
 ### Keybindings
