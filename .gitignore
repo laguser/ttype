@@ -6,3 +6,4 @@ squashfs-root/
 gen_*.py
 deploy_*.py
 fetch_*.py
+habr_article.md
