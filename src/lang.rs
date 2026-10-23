@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DictMeta {
@@ -16,7 +16,7 @@ pub struct LangManager {
 }
 
 impl LangManager {
-    pub fn new(dicts_dir: &PathBuf) -> Self {
+    pub fn new(dicts_dir: &Path) -> Self {
         let manifest_path = dicts_dir.join("manifest.json");
         let mut items = Vec::new();
         if manifest_path.exists() {
@@ -37,7 +37,7 @@ impl LangManager {
                 DictMeta { id: "english_5k".into(), name: "English 5K".into(), words_count: 5000, file: "english_5k.txt".into() },
                 DictMeta { id: "english_10k".into(), name: "English 10K".into(), words_count: 9944, file: "english_10k.txt".into() },
                 DictMeta { id: "war_and_peace_ru".into(), name: "War & Peace Quotes (RU)".into(), words_count: 1163, file: "war_and_peace_ru.txt".into() },
-                DictMeta { id: "war_and_peace_en".into(), name: "War & Peace Quotes (EN)".into(), words_count: 6488, file: "war_and_peace_en.txt".into() },
+                DictMeta { id: "war_and_peace_en".into(), name: "War & Peace Quotes (EN)".into(), words_count: 6491, file: "war_and_peace_en.txt".into() },
                 DictMeta { id: "code_rust".into(), name: "Code: Rust".into(), words_count: 192, file: "code_rust.txt".into() },
                 DictMeta { id: "code_python".into(), name: "Code: Python".into(), words_count: 174, file: "code_python.txt".into() },
                 DictMeta { id: "code_javascript".into(), name: "Code: JavaScript".into(), words_count: 126, file: "code_javascript.txt".into() },
@@ -69,25 +69,26 @@ impl LangManager {
         mgr
     }
 
-    pub fn refresh_installed(&mut self, dicts_dir: &PathBuf) {
+    pub fn refresh_installed(&mut self, dicts_dir: &Path) {
         self.installed.clear();
         if let Ok(entries) = fs::read_dir(dicts_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() {
+                if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("txt") {
                     if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                         self.installed.push(stem.to_string());
                     }
                 }
             }
         }
+        self.installed.sort();
     }
 
     pub fn is_installed(&self, id: &str) -> bool {
         self.installed.iter().any(|i| i == id)
     }
 
-    pub fn delete_dict(&mut self, dicts_dir: &PathBuf, id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn delete_dict(&mut self, dicts_dir: &Path, id: &str) -> Result<(), Box<dyn std::error::Error>> {
         let file_path = dicts_dir.join(format!("{}.txt", id));
         if file_path.exists() {
             fs::remove_file(file_path)?;
@@ -98,7 +99,7 @@ impl LangManager {
 
     pub fn download_dict<F>(
         &mut self,
-        dicts_dir: &PathBuf,
+        dicts_dir: &Path,
         base_url: &str,
         item: &DictMeta,
         mut on_progress: F,

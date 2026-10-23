@@ -5,7 +5,7 @@ mod words;
 
 use audio::SoundEngine;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -162,23 +162,33 @@ impl App {
             if let Some(dicts_dir) = DataStore::dicts_dir() {
                 let file_path = dicts_dir.join(format!("{}.txt", self.active_lang));
                 if let Some(custom_words) = words::load_dict_words(&file_path) {
+                    if self.active_lang.starts_with("war_and_peace") {
+                        let count = if self.duration == TestDuration::Sec30 { 3 } else { 2 };
+                        let mut pool = custom_words;
+                        pool.shuffle(&mut rng);
+                        return pool.into_iter().take(count).collect::<Vec<_>>().join(" ");
+                    }
+
+                    let is_code_dict = self.active_lang.starts_with("code_");
                     let mut chosen = Vec::new();
                     let mut last_word = String::new();
                     for _ in 0..120 {
                         if let Some(w) = custom_words.choose(&mut rng) {
-                            if w == &last_word {
+                            if w == &last_word && custom_words.len() > 1 {
                                 continue;
                             }
                             last_word = w.clone();
                             let mut word = w.clone();
-                            if self.store.config.punctuation && rng.gen_bool(0.25) {
-                                if let Some(&punc) = [",", ".", "!", "?", " -", ";", ":"].choose(&mut rng) {
-                                    word.push_str(punc);
+                            if !is_code_dict {
+                                if self.store.config.punctuation && rng.gen_bool(0.25) {
+                                    if let Some(&punc) = [",", ".", "!", "?", " -", ";", ":"].choose(&mut rng) {
+                                        word.push_str(punc);
+                                    }
                                 }
-                            }
-                            if self.store.config.numbers && rng.gen_bool(0.12) {
-                                let num = rng.gen_range(0..100);
-                                word = format!("{}{}", word, num);
+                                if self.store.config.numbers && rng.gen_bool(0.12) {
+                                    let num = rng.gen_range(0..100);
+                                    word = format!("{}{}", word, num);
+                                }
                             }
                             chosen.push(word);
                         }
@@ -283,6 +293,9 @@ impl App {
 
         let wpm = (correct as f64 / 5.0) / (elapsed_secs / 60.0);
         let cpm = (correct as f64) / (elapsed_secs / 60.0);
+        if self.wpm_samples.is_empty() {
+            self.wpm_samples.push(wpm as u64);
+        }
 
         let result = TestResult {
             date: chrono::Local::now(),
@@ -306,7 +319,10 @@ impl App {
         self.mode = AppMode::Result;
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) {
+    pub fn handle_key<F>(&mut self, key: KeyEvent, mut redraw: F)
+    where
+        F: FnMut(&Self),
+    {
         match self.mode {
             AppMode::Typing => match key.code {
                 KeyCode::Tab => self.reset_test(),
@@ -330,6 +346,9 @@ impl App {
                     }
                 }
                 KeyCode::Char(c) => {
+                    if key.modifiers.contains(KeyModifiers::CONTROL) || key.modifiers.contains(KeyModifiers::ALT) {
+                        return;
+                    }
                     if self.start_time.is_none() {
                         self.start_time = Some(Instant::now());
                     }
@@ -373,7 +392,20 @@ impl App {
                         self.settings_cursor += 1;
                     }
                 }
+                KeyCode::Char('m') => {
+                    self.store.config.mirror = match self.store.config.mirror {
+                        DownloadSource::Moscow => DownloadSource::Germany,
+                        DownloadSource::Germany => DownloadSource::JsDelivr,
+                        DownloadSource::JsDelivr => DownloadSource::GitHub,
+                        DownloadSource::GitHub => DownloadSource::Moscow,
+                    };
+                    self.store.save();
+                }
+                KeyCode::F(5) => {
+                    self.mode = AppMode::Languages;
+                }
                 KeyCode::Enter | KeyCode::Char(' ') | KeyCode::Right | KeyCode::Left => {
+                    let forward = !matches!(key.code, KeyCode::Left);
                     match self.settings_cursor {
                         0 => {
                             self.store.config.sound_enabled = !self.store.config.sound_enabled;
@@ -386,31 +418,62 @@ impl App {
                         3 => self.store.config.live_wpm = !self.store.config.live_wpm,
                         4 => self.store.config.sudden_death = !self.store.config.sudden_death,
                         5 => {
-                            self.store.config.theme = match self.store.config.theme {
-                                ThemeColor::Auto => ThemeColor::Catppuccin,
-                                ThemeColor::Catppuccin => ThemeColor::TokyoNight,
-                                ThemeColor::TokyoNight => ThemeColor::Nord,
-                                ThemeColor::Nord => ThemeColor::Gruvbox,
-                                ThemeColor::Gruvbox => ThemeColor::Dracula,
-                                ThemeColor::Dracula => ThemeColor::Amber,
-                                ThemeColor::Amber => ThemeColor::White,
-                                ThemeColor::White => ThemeColor::Auto,
+                            self.store.config.theme = if forward {
+                                match self.store.config.theme {
+                                    ThemeColor::Auto => ThemeColor::Catppuccin,
+                                    ThemeColor::Catppuccin => ThemeColor::TokyoNight,
+                                    ThemeColor::TokyoNight => ThemeColor::Nord,
+                                    ThemeColor::Nord => ThemeColor::Gruvbox,
+                                    ThemeColor::Gruvbox => ThemeColor::Dracula,
+                                    ThemeColor::Dracula => ThemeColor::Amber,
+                                    ThemeColor::Amber => ThemeColor::White,
+                                    ThemeColor::White => ThemeColor::Auto,
+                                }
+                            } else {
+                                match self.store.config.theme {
+                                    ThemeColor::Auto => ThemeColor::White,
+                                    ThemeColor::Catppuccin => ThemeColor::Auto,
+                                    ThemeColor::TokyoNight => ThemeColor::Catppuccin,
+                                    ThemeColor::Nord => ThemeColor::TokyoNight,
+                                    ThemeColor::Gruvbox => ThemeColor::Nord,
+                                    ThemeColor::Dracula => ThemeColor::Gruvbox,
+                                    ThemeColor::Amber => ThemeColor::Dracula,
+                                    ThemeColor::White => ThemeColor::Amber,
+                                }
                             };
                         }
                         6 => {
-                            self.store.config.visual = match self.store.config.visual {
-                                VisualStyle::Tape => VisualStyle::Underline,
-                                VisualStyle::Underline => VisualStyle::Blocky,
-                                VisualStyle::Blocky => VisualStyle::Minimal,
-                                VisualStyle::Minimal => VisualStyle::Tape,
+                            self.store.config.visual = if forward {
+                                match self.store.config.visual {
+                                    VisualStyle::Tape => VisualStyle::Underline,
+                                    VisualStyle::Underline => VisualStyle::Blocky,
+                                    VisualStyle::Blocky => VisualStyle::Minimal,
+                                    VisualStyle::Minimal => VisualStyle::Tape,
+                                }
+                            } else {
+                                match self.store.config.visual {
+                                    VisualStyle::Tape => VisualStyle::Minimal,
+                                    VisualStyle::Underline => VisualStyle::Tape,
+                                    VisualStyle::Blocky => VisualStyle::Underline,
+                                    VisualStyle::Minimal => VisualStyle::Blocky,
+                                }
                             };
                         }
                         7 => {
-                            self.store.config.mirror = match self.store.config.mirror {
-                                DownloadSource::Moscow => DownloadSource::Germany,
-                                DownloadSource::Germany => DownloadSource::JsDelivr,
-                                DownloadSource::JsDelivr => DownloadSource::GitHub,
-                                DownloadSource::GitHub => DownloadSource::Moscow,
+                            self.store.config.mirror = if forward {
+                                match self.store.config.mirror {
+                                    DownloadSource::Moscow => DownloadSource::Germany,
+                                    DownloadSource::Germany => DownloadSource::JsDelivr,
+                                    DownloadSource::JsDelivr => DownloadSource::GitHub,
+                                    DownloadSource::GitHub => DownloadSource::Moscow,
+                                }
+                            } else {
+                                match self.store.config.mirror {
+                                    DownloadSource::Moscow => DownloadSource::GitHub,
+                                    DownloadSource::Germany => DownloadSource::Moscow,
+                                    DownloadSource::JsDelivr => DownloadSource::Germany,
+                                    DownloadSource::GitHub => DownloadSource::JsDelivr,
+                                }
                             };
                         }
                         _ => {}
@@ -444,6 +507,9 @@ impl App {
                     self.store.save();
                 }
                 KeyCode::Char('d') | KeyCode::Delete | KeyCode::Backspace => {
+                    if self.lang_cursor >= self.lang_manager.items.len() {
+                        return;
+                    }
                     if let Some(dicts_dir) = DataStore::dicts_dir() {
                         let item = self.lang_manager.items[self.lang_cursor].clone();
                         let is_inst = self.lang_manager.is_installed(&item.id);
@@ -467,6 +533,9 @@ impl App {
                     }
                 }
                 KeyCode::Enter | KeyCode::Char(' ') => {
+                    if self.lang_cursor >= self.lang_manager.items.len() {
+                        return;
+                    }
                     if let Some(dicts_dir) = DataStore::dicts_dir() {
                         let item = self.lang_manager.items[self.lang_cursor].clone();
                         let base_url = self.store.config.mirror.base_url();
@@ -481,12 +550,24 @@ impl App {
                         } else {
                             self.lang_status_msg = Some(format!("◷ downloading {}...", item.name));
                             self.download_progress = Some(0.0);
-                            let mut last_pct = 0.0;
-                            let res = self.lang_manager.download_dict(&dicts_dir, base_url, &item, |_dl, total| {
+                            redraw(self);
+                            let mut lang_mgr = std::mem::replace(
+                                &mut self.lang_manager,
+                                LangManager {
+                                    items: Vec::new(),
+                                    installed: Vec::new(),
+                                },
+                            );
+                            // Keep items populated on self so UI rendering during download still shows the list
+                            self.lang_manager.items = lang_mgr.items.clone();
+                            self.lang_manager.installed = lang_mgr.installed.clone();
+                            let res = lang_mgr.download_dict(&dicts_dir, base_url, &item, |dl, total| {
                                 if total > 0 {
-                                    last_pct = (_dl as f64 / total as f64).min(1.0);
+                                    self.download_progress = Some((dl as f64 / total as f64).min(1.0));
+                                    redraw(self);
                                 }
                             });
+                            self.lang_manager = lang_mgr;
                             match res {
                                 Ok(_) => {
                                     self.download_progress = None;
@@ -625,6 +706,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
                 if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                     break;
                 }
@@ -653,7 +737,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     continue;
                 }
 
-                app.handle_key(key);
+                app.handle_key(key, |app_state| {
+                    let _ = terminal.draw(|f| ui(f, app_state));
+                });
             }
         }
 
@@ -835,6 +921,7 @@ fn render_single_line_stream(f: &mut Frame, app: &App, area: Rect) {
                         format!("▊{}", target_c),
                         Style::default().fg(accent).add_modifier(Modifier::BOLD),
                     ));
+                    current_slot += 1;
                 }
                 VisualStyle::Minimal => {
                     spans.push(Span::styled(
@@ -924,9 +1011,9 @@ fn render_settings_view(f: &mut Frame, app: &App, size: Rect) {
         ("♪  sound effects", if app.store.config.sound_enabled { "on" } else { "off" }),
         ("•  punctuation", if app.store.config.punctuation { "on" } else { "off" }),
         ("№  numbers", if app.store.config.numbers { "on" } else { "off" }),
-        ("⚡  live wpm", if app.store.config.live_wpm { "on" } else { "off" }),
+        ("⚡ live wpm", if app.store.config.live_wpm { "on" } else { "off" }),
         ("☠  sudden death", if app.store.config.sudden_death { "on" } else { "off" }),
-        ("🎨 theme", app.store.config.theme.name()),
+        ("◈  theme", app.store.config.theme.name()),
         ("❖  style", app.store.config.visual.name()),
         ("◧  mirror cdn", app.store.config.mirror.name()),
     ];

@@ -1,6 +1,6 @@
 // словари для тренировки печати :d
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub const WORDS_EN: &[&str] = &[
     "the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not", "on", "with",
@@ -16,7 +16,7 @@ pub const WORDS_EN: &[&str] = &[
     "rhythm", "steady", "clean", "light", "dark", "heart", "soul", "sharp", "simple", "craft", "metal",
     "world", "system", "program", "silent", "shadow", "future", "vision", "memory", "stream", "buffer",
     "source", "engine", "signal", "vector", "screen", "pixel", "matrix", "hacker", "device", "random",
-    "matrix", "cyber", "ghost", "neural", "logic", "syntax", "thread", "packet", "socket", "daemon"
+    "cyber", "ghost", "neural", "logic", "syntax", "thread", "packet", "socket", "daemon"
 ];
 
 // код и сниппеты >_<
@@ -46,7 +46,7 @@ pub const QUOTES: &[&str] = &[
 ];
 
 // Читаем слова из скачанного файла словаря
-pub fn load_dict_words(path: &PathBuf) -> Option<Vec<String>> {
+pub fn load_dict_words(path: &Path) -> Option<Vec<String>> {
     if let Ok(content) = fs::read_to_string(path) {
         let words: Vec<String> = content
             .lines()

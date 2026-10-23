@@ -1,6 +1,6 @@
 # Maintainer: laguser <laguser@users.noreply.github.com>
 pkgname=ttype-git
-pkgver=0.1.0
+pkgver=0.1.2
 pkgrel=1
 pkgdesc="Minimalist terminal typing speed test in Rust with typewriter conveyor tape and procedural sound"
 arch=('x86_64' 'aarch64')
