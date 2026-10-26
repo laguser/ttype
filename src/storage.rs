@@ -125,6 +125,8 @@ pub struct TestResult {
     pub incorrect_chars: usize,
     pub total_chars: usize,
     pub wpm_sparkline: Vec<u64>,
+    #[serde(default)]
+    pub top_mistakes: Vec<(char, usize)>,
 }
 
 // локальная бд в json :d
