@@ -21,7 +21,6 @@ minimalist terminal typing speed test
 - **Keyboard Heatmap (`k` in results):** visual error map showing lifetime mistyped keys
 - **Accidental exit protection:** prevents accidental skipping of result screen while typing fast
 - **Wordlists on demand (`F5`):** Blind Typing dicts, 1K–10K tiers, code, War & Peace
-- **Multi-mirror CDN:** Moscow VPS, Germany VPS, jsDelivr Edge, GitHub Raw
 - **Local stats:** WPM sparkline chart (` ▂▃▅▆▇█`), accuracy, CPM, history
 
 ### Install
@@ -55,7 +54,6 @@ install -m 755 target/release/ttype ~/.local/bin/
 | `f5` | Languages manager |
 | `k` | Keyboard error heatmap *(in results)* |
 | `d` / `del` | Delete dictionary *(in F5)* |
-| `m` | Switch mirror *(in F5 / F4)* |
 | `esc` | Back to typing |
 | `esc esc` | Quit |
 

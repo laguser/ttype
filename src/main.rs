@@ -24,7 +24,7 @@ use std::{
     io,
     time::{Duration, Instant},
 };
-use storage::{DataStore, DownloadSource, TestResult, ThemeColor, VisualStyle};
+use storage::{DataStore, TestResult, ThemeColor, VisualStyle};
 
 // лимиты времени и режимы
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -450,18 +450,9 @@ impl App {
                     }
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    if self.settings_cursor < 7 {
+                    if self.settings_cursor < 6 {
                         self.settings_cursor += 1;
                     }
-                }
-                KeyCode::Char('m') => {
-                    self.store.config.mirror = match self.store.config.mirror {
-                        DownloadSource::Moscow => DownloadSource::Germany,
-                        DownloadSource::Germany => DownloadSource::JsDelivr,
-                        DownloadSource::JsDelivr => DownloadSource::GitHub,
-                        DownloadSource::GitHub => DownloadSource::Moscow,
-                    };
-                    self.store.save();
                 }
                 KeyCode::F(5) => {
                     self.mode = AppMode::Languages;
@@ -521,23 +512,6 @@ impl App {
                                 }
                             };
                         }
-                        7 => {
-                            self.store.config.mirror = if forward {
-                                match self.store.config.mirror {
-                                    DownloadSource::Moscow => DownloadSource::Germany,
-                                    DownloadSource::Germany => DownloadSource::JsDelivr,
-                                    DownloadSource::JsDelivr => DownloadSource::GitHub,
-                                    DownloadSource::GitHub => DownloadSource::Moscow,
-                                }
-                            } else {
-                                match self.store.config.mirror {
-                                    DownloadSource::Moscow => DownloadSource::GitHub,
-                                    DownloadSource::Germany => DownloadSource::Moscow,
-                                    DownloadSource::JsDelivr => DownloadSource::Germany,
-                                    DownloadSource::GitHub => DownloadSource::JsDelivr,
-                                }
-                            };
-                        }
                         _ => {}
                     }
                     self.store.save();
@@ -558,15 +532,6 @@ impl App {
                     if self.lang_cursor + 1 < self.lang_manager.items.len() {
                         self.lang_cursor += 1;
                     }
-                }
-                KeyCode::Char('m') | KeyCode::Tab => {
-                    self.store.config.mirror = match self.store.config.mirror {
-                        DownloadSource::Moscow => DownloadSource::Germany,
-                        DownloadSource::Germany => DownloadSource::JsDelivr,
-                        DownloadSource::JsDelivr => DownloadSource::GitHub,
-                        DownloadSource::GitHub => DownloadSource::Moscow,
-                    };
-                    self.store.save();
                 }
                 KeyCode::Char('d') | KeyCode::Delete | KeyCode::Backspace => {
                     if self.lang_cursor >= self.lang_manager.items.len() {
@@ -600,7 +565,6 @@ impl App {
                     }
                     if let Some(dicts_dir) = DataStore::dicts_dir() {
                         let item = self.lang_manager.items[self.lang_cursor].clone();
-                        let base_url = self.store.config.mirror.base_url();
                         let is_inst = self.lang_manager.is_installed(&item.id);
 
                         if is_inst {
@@ -623,7 +587,7 @@ impl App {
                             // Keep items populated on self so UI rendering during download still shows the list
                             self.lang_manager.items = lang_mgr.items.clone();
                             self.lang_manager.installed = lang_mgr.installed.clone();
-                            let res = lang_mgr.download_dict(&dicts_dir, base_url, &item, |dl, total| {
+                            let res = lang_mgr.download_dict(&dicts_dir, &item, |dl, total| {
                                 if total > 0 {
                                     self.download_progress = Some((dl as f64 / total as f64).min(1.0));
                                     redraw(self);
@@ -734,7 +698,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("  f2                      Cycle goal (15s -> 30s -> 10w -> 25w -> 50w -> 100w)");
                 println!("  f3                      View local stats & records");
                 println!("  f4                      Settings menu");
-                println!("  f5                      Languages & mirror downloader (all Blind Typing langs)");
+                println!("  f5                      Languages downloader (all Blind Typing langs)");
                 println!("  esc                     Restart test / back to typing");
                 println!("  esc esc                 Quit application");
                 return Ok(());
@@ -1117,7 +1081,6 @@ fn render_settings_view(f: &mut Frame, app: &App, size: Rect) {
         ("☠  sudden death", if app.store.config.sudden_death { "on" } else { "off" }),
         ("◈  theme", app.store.config.theme.name()),
         ("❖  style", app.store.config.visual.name()),
-        ("◧  mirror cdn", app.store.config.mirror.name()),
     ];
 
     for (idx, (label, val)) in items.iter().enumerate() {
@@ -1151,7 +1114,7 @@ fn render_settings_view(f: &mut Frame, app: &App, size: Rect) {
     f.render_widget(p, v[1]);
 }
 
-// меню языков (Blind Typing / Monkeytype 1k, 2k, 10k) с выбором зеркал
+// меню языков (Blind Typing / Monkeytype 1k, 2k, 10k)
 fn render_languages_view(f: &mut Frame, app: &App, size: Rect) {
     let accent = app.theme_accent();
     let v = Layout::default()
@@ -1163,9 +1126,7 @@ fn render_languages_view(f: &mut Frame, app: &App, size: Rect) {
 
     lines.push(Line::from(vec![
         Span::styled("◧  languages & wordlists", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
-        Span::styled("  //  mirror: ", Style::default().fg(Color::DarkGray)),
-        Span::styled(format!("[{}]", app.store.config.mirror.name()), Style::default().fg(Color::White)),
-        Span::styled(" (press 'm' to switch)", Style::default().fg(Color::Rgb(90, 90, 90))),
+        Span::styled("  //  github repository", Style::default().fg(Color::DarkGray)),
     ]));
     lines.push(Line::from(Span::styled("────────────────────────────────────────────────────────────────", Style::default().fg(Color::Rgb(50, 50, 50)))));
 
@@ -1228,7 +1189,7 @@ fn render_languages_view(f: &mut Frame, app: &App, size: Rect) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "↑ / ↓ scroll   •   ↵ select / download   •   'd' / del delete   •   'm' switch mirror   •   ⎋ back",
+        "↑ / ↓ scroll   •   ↵ select / download   •   'd' / del delete   •   ⎋ back",
         Style::default().fg(Color::DarkGray),
     )));
 

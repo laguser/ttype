@@ -97,10 +97,11 @@ impl LangManager {
         Ok(())
     }
 
+    pub const GITHUB_BASE_URL: &'static str = "https://raw.githubusercontent.com/laguser/ttype/main/dicts";
+
     pub fn download_dict<F>(
         &mut self,
         dicts_dir: &Path,
-        base_url: &str,
         item: &DictMeta,
         mut on_progress: F,
     ) -> Result<(), Box<dyn std::error::Error>>
@@ -109,7 +110,7 @@ impl LangManager {
     {
         use std::io::Read;
 
-        let url = format!("{}/{}", base_url.trim_end_matches('/'), item.file);
+        let url = format!("{}/{}", Self::GITHUB_BASE_URL.trim_end_matches('/'), item.file);
         let resp = ureq::get(&url)
             .timeout(std::time::Duration::from_secs(15))
             .call()?;

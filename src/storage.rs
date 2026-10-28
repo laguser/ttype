@@ -51,35 +51,6 @@ impl ThemeColor {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
-pub enum DownloadSource {
-    #[default]
-    Moscow,    // msc-1 VPS (Россия)
-    Germany,   // de-1 VPS (Европа)
-    JsDelivr,  // jsDelivr Global Edge CDN
-    GitHub,    // GitHub Raw CDN
-}
-
-impl DownloadSource {
-    pub fn name(&self) -> &'static str {
-        match self {
-            DownloadSource::Moscow => "moscow (vps)",
-            DownloadSource::Germany => "germany (vps)",
-            DownloadSource::JsDelivr => "jsdelivr (fast cdn)",
-            DownloadSource::GitHub => "github (raw)",
-        }
-    }
-
-    pub fn base_url(&self) -> &'static str {
-        match self {
-            DownloadSource::Moscow => "http://93.88.203.50:8089/ttype/dicts",
-            DownloadSource::Germany => "http://31.76.11.45:8089/ttype/dicts",
-            DownloadSource::JsDelivr => "https://cdn.jsdelivr.net/gh/laguser/ttype@main/dicts",
-            DownloadSource::GitHub => "https://raw.githubusercontent.com/laguser/ttype/main/dicts",
-        }
-    }
-}
-
 // локальный конфиг юзера
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
@@ -90,8 +61,6 @@ pub struct Config {
     pub visual: VisualStyle,
     pub live_wpm: bool,
     pub sudden_death: bool,
-    #[serde(default)]
-    pub mirror: DownloadSource,
     #[serde(default)]
     pub active_lang: String,
 }
@@ -106,7 +75,6 @@ impl Default for Config {
             visual: VisualStyle::Tape,
             live_wpm: true,
             sudden_death: false,
-            mirror: DownloadSource::Moscow,
             active_lang: String::from("en"),
         }
     }
