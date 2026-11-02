@@ -16,7 +16,9 @@ minimalist terminal typing speed test
 - **Conveyor tape:** smooth single-line stream with fade transitions
 - **Monochrome aesthetic:** inherits terminal background transparency
 - **Procedural sound:** synthesized mechanical switches and carriage bell
-- **Flexible goals (`F2`):** time modes (`15s`, `30s`) and word count modes (`10w`, `25w`, `50w`, `100w`)
+- **Flexible goals (`F2`):** time modes (`15s`, `30s`), word counts (`10w`, `25w`, `50w`, `100w`), and endless **Zen Mode**
+- **Distraction-free Zen:** zero UI elements or timers — just you and the typing conveyor
+- **Share results (`s` in results):** instant copy of formatted ASCII results with WPM trend sparkline to clipboard
 - **Key error analysis:** identifies most missed keys after each test
 - **Keyboard Heatmap (`k` in results):** visual error map showing lifetime mistyped keys
 - **Accidental exit protection:** prevents accidental skipping of result screen while typing fast
@@ -48,13 +50,14 @@ install -m 755 target/release/ttype ~/.local/bin/
 |:---|:---|
 | `tab` | Restart test / new line |
 | `f1` | Cycle mode (`en` → `code` → `quotes` → dict) |
-| `f2` | Cycle goal (`15s` → `30s` → `10w` → `25w` → `50w` → `100w`) |
+| `f2` | Cycle goal (`15s` → `30s` → `10w` → `25w` → `50w` → `100w` → `zen`) |
 | `f3` | History & records |
 | `f4` | Settings |
 | `f5` | Languages manager |
+| `s` | Share result card to clipboard *(in results)* |
 | `k` | Keyboard error heatmap *(in results)* |
 | `d` / `del` | Delete dictionary *(in F5)* |
-| `esc` | Back to typing |
+| `esc` | Back to typing / finish zen |
 | `esc esc` | Quit |
 
 ### License

@@ -31,6 +31,7 @@ use storage::{DataStore, TestResult, ThemeColor, VisualStyle};
 pub enum TestGoal {
     Time(u64),  // 15s, 30s
     Words(usize), // 10, 25, 50, 100 words
+    Zen,        // бесконечный чистый дзен-режим без таймеров и счетчиков
 }
 
 impl TestGoal {
@@ -38,6 +39,7 @@ impl TestGoal {
         match self {
             TestGoal::Time(s) => format!("{}s", s),
             TestGoal::Words(w) => format!("{}w", w),
+            TestGoal::Zen => "zen".to_string(),
         }
     }
 }
@@ -73,6 +75,7 @@ pub struct App {
     pub last_result: Option<TestResult>,
     pub result_opened_at: Option<Instant>,
     pub last_esc_press: Option<Instant>,
+    pub share_status_msg: Option<String>,
 }
 
 impl App {
@@ -108,6 +111,7 @@ impl App {
             last_result: None,
             result_opened_at: None,
             last_esc_press: None,
+            share_status_msg: None,
         };
         app.reset_test();
         app
@@ -153,6 +157,7 @@ impl App {
         match self.goal {
             TestGoal::Time(_) => 120,
             TestGoal::Words(w) => w,
+            TestGoal::Zen => 80,
         }
     }
 
@@ -164,6 +169,7 @@ impl App {
             let count = match self.goal {
                 TestGoal::Time(s) => if s >= 30 { 3 } else { 2 },
                 TestGoal::Words(w) => (w / 15).max(1),
+                TestGoal::Zen => 2,
             };
             let mut quotes_pool = words::QUOTES.to_vec();
             quotes_pool.shuffle(&mut rng);
@@ -189,6 +195,7 @@ impl App {
                         let count = match self.goal {
                             TestGoal::Time(s) => if s >= 30 { 3 } else { 2 },
                             TestGoal::Words(w) => (w / 15).max(1),
+                            TestGoal::Zen => 2,
                         };
                         let mut pool = custom_words;
                         pool.shuffle(&mut rng);
@@ -260,6 +267,7 @@ impl App {
         self.end_time = None;
         self.wpm_samples.clear();
         self.last_sample_sec = 0;
+        self.share_status_msg = None;
         self.mode = AppMode::Typing;
     }
 
@@ -278,7 +286,7 @@ impl App {
                     Some(limit)
                 }
             }
-            TestGoal::Words(_) => None,
+            TestGoal::Words(_) | TestGoal::Zen => None,
         }
     }
 
@@ -294,7 +302,7 @@ impl App {
                 }
                 Some((completed, target_count))
             }
-            TestGoal::Time(_) => None,
+            TestGoal::Time(_) | TestGoal::Zen => None,
         }
     }
 
@@ -373,6 +381,7 @@ impl App {
         self.store.save_result(result.clone());
         self.last_result = Some(result);
         self.result_opened_at = Some(Instant::now());
+        self.share_status_msg = None;
         self.mode = AppMode::Result;
     }
 
@@ -391,7 +400,8 @@ impl App {
                         TestGoal::Words(10) => TestGoal::Words(25),
                         TestGoal::Words(25) => TestGoal::Words(50),
                         TestGoal::Words(50) => TestGoal::Words(100),
-                        TestGoal::Words(100) => TestGoal::Time(15),
+                        TestGoal::Words(100) => TestGoal::Zen,
+                        TestGoal::Zen => TestGoal::Time(15),
                         _ => TestGoal::Time(15),
                     };
                     self.reset_test();
@@ -437,7 +447,14 @@ impl App {
                     }
 
                     self.typed_chars.push(c);
-                    if self.typed_chars.len() >= self.target_chars.len() {
+                    if self.goal == TestGoal::Zen {
+                        // В бесконечном Zen режиме автоматически догенерируем новые слова,
+                        // когда пользователь приближается к концу буфера
+                        if self.target_chars.len().saturating_sub(self.typed_chars.len()) < 40 {
+                            let append_text = format!(" {}", self.generate_text());
+                            self.target_chars.extend(append_text.chars());
+                        }
+                    } else if self.typed_chars.len() >= self.target_chars.len() {
                         self.finish_test();
                     }
                 }
@@ -628,7 +645,44 @@ impl App {
                     self.reset_test();
                 }
                 KeyCode::Char('k') => self.mode = AppMode::Heatmap,
-                KeyCode::Char('s') | KeyCode::F(4) => self.mode = AppMode::Settings,
+                KeyCode::Char('s') => {
+                    if let Some(res) = &self.last_result {
+                        let sparkline = render_sparkline(&res.wpm_sparkline);
+                        let mut share_text = format!(
+                            "ttype ── {:.0} WPM • {:.1}% ACC • {}\n",
+                            res.wpm, res.accuracy, res.mode_name
+                        );
+                        share_text.push_str(&format!(
+                            "speed: {} cpm • errors: {} • time: {}s\n",
+                            res.cpm as u64, res.incorrect_chars, res.duration_secs
+                        ));
+                        if !res.top_mistakes.is_empty() {
+                            let misses: Vec<String> = res
+                                .top_mistakes
+                                .iter()
+                                .map(|(c, cnt)| {
+                                    let ch = if *c == ' ' { "␣" } else { &c.to_string() };
+                                    format!("'{}'×{}", ch, cnt)
+                                })
+                                .collect();
+                            share_text.push_str(&format!("missed: {}\n", misses.join(" ")));
+                        }
+                        if !sparkline.is_empty() {
+                            share_text.push_str(&format!("trend: {}\n", sparkline));
+                        }
+                        share_text.push_str("https://github.com/laguser/ttype");
+
+                        match copy_to_clipboard(&share_text) {
+                            Ok(_) => {
+                                self.share_status_msg = Some("✓ copied to clipboard!".to_string());
+                            }
+                            Err(_) => {
+                                self.share_status_msg = Some("✕ failed to copy".to_string());
+                            }
+                        }
+                    }
+                }
+                KeyCode::F(4) => self.mode = AppMode::Settings,
                 KeyCode::Char('h') | KeyCode::F(3) => self.mode = AppMode::HistoryView,
                 KeyCode::Char('l') | KeyCode::F(5) => self.mode = AppMode::Languages,
                 _ => {}
@@ -674,6 +728,77 @@ fn render_sparkline(samples: &[u64]) -> String {
         .collect()
 }
 
+// Копирование текста в буфер обмена системы (с фолбэками: wl-copy, xclip, OSC 52)
+fn copy_to_clipboard(text: &str) -> Result<(), Box<dyn Error>> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    // 1. Попытка через wl-copy (Wayland)
+    if let Ok(mut child) = Command::new("wl-copy")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        if let Ok(status) = child.wait() {
+            if status.success() {
+                return Ok(());
+            }
+        }
+    }
+
+    // 2. Попытка через xclip (X11)
+    if let Ok(mut child) = Command::new("xclip")
+        .args(["-selection", "clipboard"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        if let Ok(status) = child.wait() {
+            if status.success() {
+                return Ok(());
+            }
+        }
+    }
+
+    // 3. Фолбэк через OSC 52 escape-последовательность терминала
+    const B64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes = text.as_bytes();
+    let mut b64 = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0];
+        let b1 = if chunk.len() > 1 { chunk[1] } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] } else { 0 };
+
+        b64.push(B64_CHARS[(b0 >> 2) as usize] as char);
+        b64.push(B64_CHARS[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
+        if chunk.len() > 1 {
+            b64.push(B64_CHARS[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char);
+        } else {
+            b64.push('=');
+        }
+        if chunk.len() > 2 {
+            b64.push(B64_CHARS[(b2 & 0x3f) as usize] as char);
+        } else {
+            b64.push('=');
+        }
+    }
+
+    let osc52 = format!("\x1b]52;c;{}\x07", b64);
+    let mut stdout = io::stdout();
+    let _ = stdout.write_all(osc52.as_bytes());
+    let _ = stdout.flush();
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
     let mut init_mode: Option<String> = None;
@@ -690,16 +815,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("  -m, --mode <MODE>       Practice mode: en, code, quotes, or installed dict id");
                 println!("  -t, --time <SECS>       Test duration: 15, 30");
                 println!("  -w, --words <COUNT>     Word count goal: 10, 25, 50, 100");
+                println!("  -z, --zen               Endless distraction-free zen mode");
                 println!("  -h, --help              Print this help message");
                 println!("  -v, --version           Print version\n");
                 println!("KEYBINDINGS:");
                 println!("  tab                     Restart test / new sheet");
                 println!("  f1                      Cycle mode (en -> code -> quotes -> custom)");
-                println!("  f2                      Cycle goal (15s -> 30s -> 10w -> 25w -> 50w -> 100w)");
+                println!("  f2                      Cycle goal (15s -> 30s -> 10w -> 25w -> 50w -> 100w -> zen)");
                 println!("  f3                      View local stats & records");
                 println!("  f4                      Settings menu");
                 println!("  f5                      Languages downloader (all Blind Typing langs)");
-                println!("  esc                     Restart test / back to typing");
+                println!("  s                       Share / copy results to clipboard (in results)");
+                println!("  k                       Keyboard heatmap (in results)");
+                println!("  esc                     Restart test / finish zen / back to typing");
                 println!("  esc esc                 Quit application");
                 return Ok(());
             }
@@ -724,6 +852,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if let Ok(w) = args[i].parse::<usize>() {
                     init_duration = Some(TestGoal::Words(w));
                 }
+            }
+            "-z" | "--zen" => {
+                init_duration = Some(TestGoal::Zen);
             }
             _ => {}
         }
@@ -777,7 +908,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     app.last_esc_press = Some(now);
 
                     match app.mode {
-                        AppMode::Typing => app.reset_test(),
+                        AppMode::Typing => {
+                            if app.goal == TestGoal::Zen && app.typed_chars.len() >= 5 {
+                                app.finish_test();
+                            } else {
+                                app.reset_test();
+                            }
+                        }
                         AppMode::Result => {
                             // Защита от случайного выхода из результатов:
                             // по первому Esc ничего не сбрасываем, ждем Tab для retry или второй Esc для выхода
@@ -828,25 +965,39 @@ fn ui(f: &mut Frame, app: &App) {
 
     match app.mode {
         AppMode::Typing => {
-            let outer = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Fill(1), Constraint::Length(1)])
-                .split(size);
+            if app.goal == TestGoal::Zen {
+                // В дзен-режиме нет НИЧЕГО лишнего: ни верхней строки, ни нижней строки, только бегущая лента
+                let center_area = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Fill(1),
+                        Constraint::Length(1),
+                        Constraint::Fill(1),
+                    ])
+                    .split(size);
 
-            let center_area = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Fill(1),
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                    Constraint::Fill(1),
-                ])
-                .split(outer[0]);
+                render_single_line_stream(f, app, center_area[1]);
+            } else {
+                let outer = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([Constraint::Fill(1), Constraint::Length(1)])
+                    .split(size);
 
-            render_top_bar(f, app, center_area[1]);
-            render_single_line_stream(f, app, center_area[3]);
-            render_bottom_bar(f, app, outer[1]);
+                let center_area = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Fill(1),
+                        Constraint::Length(1),
+                        Constraint::Length(1),
+                        Constraint::Length(1),
+                        Constraint::Fill(1),
+                    ])
+                    .split(outer[0]);
+
+                render_top_bar(f, app, center_area[1]);
+                render_single_line_stream(f, app, center_area[3]);
+                render_bottom_bar(f, app, outer[1]);
+            }
         }
         AppMode::Settings => render_settings_view(f, app, size),
         AppMode::Languages => render_languages_view(f, app, size),
@@ -1263,6 +1414,19 @@ fn render_minimal_result(f: &mut Frame, app: &App, size: Rect) {
             Span::styled(" retry     ", Style::default().fg(Color::DarkGray)),
             Span::styled("♨ k", Style::default().fg(accent)),
             Span::styled(" heatmap     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("⚡ s", Style::default().fg(accent)),
+            Span::styled(
+                if let Some(msg) = &app.share_status_msg {
+                    format!(" {}     ", msg)
+                } else {
+                    " share     ".to_string()
+                },
+                if app.share_status_msg.is_some() {
+                    Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                },
+            ),
             Span::styled("⚙ f4", Style::default().fg(accent)),
             Span::styled(" config     ", Style::default().fg(Color::DarkGray)),
             Span::styled("◧ f5", Style::default().fg(accent)),
